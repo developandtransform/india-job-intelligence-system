@@ -1,0 +1,35 @@
+# Direct employer sources that need no login and no API key.
+# Edit this file (or use ATS_BOARDS_EXTRA / CAREER_PAGE_URLS_EXTRA in .env) to add the employers you care about.
+#
+# IMPORTANT: these starter boards are the public examples documented by the open-source ATS projects this repo
+# was built from. They were NOT live-tested here (the build environment had no access to job sites).
+# Run   python main.py validate-targets   on your own PC to check each one and remove any that fail.
+#
+# Board formats:
+#   greenhouse: <slug>        https://boards.greenhouse.io/<slug>
+#   lever: <slug>             https://jobs.lever.co/<slug>
+#   ashby: <slug>             https://jobs.ashbyhq.com/<slug>
+#   smartrecruiters: <Company> https://careers.smartrecruiters.com/<Company>
+#   workable: <slug>          https://apply.workable.com/<slug>
+#   recruitee: <slug>         https://<slug>.recruitee.com
+#   personio: <slug>          https://<slug>.jobs.personio.de
+#   teamtailor: <slug>        https://<slug>.teamtailor.com
+#   breezy: <slug>            https://<slug>.breezy.hr
+#   workday: <full careers URL>   e.g. https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+#   oracle: <full careers URL>    e.g. https://<tenant>.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/requisitions
+
+ats_boards:
+  - greenhouse:stripe
+  - lever:spotify
+  - ashby:ramp
+  - smartrecruiters:Visa
+  - workday:https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+
+# Career pages that publish schema.org "JobPosting" JSON-LD (read politely, robots.txt respected).
+# Example (kept commented): add the listing page of a company career site.
+career_pages: []
+#  - https://careers.example.com/jobs
+
+# Only keep jobs whose location text mentions one of these when a board is huge (Workday/Oracle).
+# Leave as-is to scan everything; a country-wide India filter is applied later by the eligibility engine.
+board_location_prefilter: ["india"]

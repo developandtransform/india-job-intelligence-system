@@ -1,0 +1,247 @@
+# Seed registry of well-established employers (NOT startups), curated from general public knowledge.
+#
+# STATUS OF THIS DATA: **UNVERIFIED.** No entry below has a recorded evidence URL or verification date, because it
+# could not be checked against a primary source when this file was written. The application therefore reports every
+# match from this file as "Not a startup (unverified)" and adds a visible warning to each affected job.
+# COMPANY_SEED_MODE=strict in .env ignores this file for eligibility altogether (those jobs then go to
+# "Company Verification Required").
+#
+# An entry counts as Verified only when it has BOTH `evidence_url` and `verified_date` (YYYY-MM-DD), e.g.
+#   - {name: "Example Ltd", classification: "MNC", evidence_url: "https://...", verified_date: "2026-11-24"}
+# Rows in the "Company Registry" tab of your Google Sheet always win over this file.
+# Startups are deliberately NOT listed: their age and headcount must be evidenced.
+companies:
+  - {name: "Hindustan Unilever", aliases: ["HUL"], classification: "MNC"}
+  - {name: "Procter & Gamble", aliases: ["P&G"], classification: "MNC"}
+  - {name: "Nestle India", aliases: ["Nestle"], classification: "MNC"}
+  - {name: "Colgate-Palmolive", aliases: [], classification: "MNC"}
+  - {name: "Mondelez", aliases: [], classification: "MNC"}
+  - {name: "PepsiCo", aliases: [], classification: "MNC"}
+  - {name: "Coca-Cola", aliases: [], classification: "MNC"}
+  - {name: "L'Oreal", aliases: [], classification: "MNC"}
+  - {name: "Reckitt", aliases: [], classification: "MNC"}
+  - {name: "Mars", aliases: [], classification: "MNC"}
+  - {name: "Diageo", aliases: [], classification: "MNC"}
+  - {name: "Pernod Ricard", aliases: [], classification: "MNC"}
+  - {name: "Johnson & Johnson", aliases: [], classification: "MNC"}
+  - {name: "Pfizer", aliases: [], classification: "MNC"}
+  - {name: "Novartis", aliases: [], classification: "MNC"}
+  - {name: "Sanofi", aliases: [], classification: "MNC"}
+  - {name: "GlaxoSmithKline", aliases: ["GSK"], classification: "MNC"}
+  - {name: "AstraZeneca", aliases: [], classification: "MNC"}
+  - {name: "Abbott", aliases: [], classification: "MNC"}
+  - {name: "Siemens", aliases: [], classification: "MNC"}
+  - {name: "ABB", aliases: [], classification: "MNC"}
+  - {name: "Bosch", aliases: [], classification: "MNC"}
+  - {name: "Honeywell", aliases: [], classification: "MNC"}
+  - {name: "Schneider Electric", aliases: [], classification: "MNC"}
+  - {name: "3M", aliases: [], classification: "MNC"}
+  - {name: "General Electric", aliases: ["GE"], classification: "MNC"}
+  - {name: "Cisco", aliases: [], classification: "MNC"}
+  - {name: "Microsoft", aliases: [], classification: "MNC"}
+  - {name: "Google", aliases: [], classification: "MNC"}
+  - {name: "Amazon", aliases: [], classification: "MNC"}
+  - {name: "Apple", aliases: [], classification: "MNC"}
+  - {name: "Meta", aliases: [], classification: "MNC"}
+  - {name: "IBM", aliases: [], classification: "MNC"}
+  - {name: "Oracle", aliases: [], classification: "MNC"}
+  - {name: "SAP", aliases: [], classification: "MNC"}
+  - {name: "Adobe", aliases: [], classification: "MNC"}
+  - {name: "Intel", aliases: [], classification: "MNC"}
+  - {name: "Dell", aliases: [], classification: "MNC"}
+  - {name: "HP", aliases: [], classification: "MNC"}
+  - {name: "Accenture", aliases: [], classification: "MNC"}
+  - {name: "Capgemini", aliases: [], classification: "MNC"}
+  - {name: "Cognizant", aliases: [], classification: "MNC"}
+  - {name: "Philips", aliases: [], classification: "MNC"}
+  - {name: "Samsung", aliases: [], classification: "MNC"}
+  - {name: "LG Electronics", aliases: [], classification: "MNC"}
+  - {name: "Sony", aliases: [], classification: "MNC"}
+  - {name: "Toyota Kirloskar", aliases: [], classification: "MNC"}
+  - {name: "Hyundai", aliases: [], classification: "MNC"}
+  - {name: "Ford", aliases: [], classification: "MNC"}
+  - {name: "Volkswagen", aliases: [], classification: "MNC"}
+  - {name: "Mercedes-Benz", aliases: [], classification: "MNC"}
+  - {name: "BMW", aliases: [], classification: "MNC"}
+  - {name: "Whirlpool", aliases: [], classification: "MNC"}
+  - {name: "Unilever", aliases: [], classification: "MNC"}
+  - {name: "Danone", aliases: [], classification: "MNC"}
+  - {name: "Kellogg's", aliases: ["Kellanova"], classification: "MNC"}
+  - {name: "Cargill", aliases: [], classification: "MNC"}
+  - {name: "Bayer", aliases: [], classification: "MNC"}
+  - {name: "BASF", aliases: [], classification: "MNC"}
+  - {name: "Shell", aliases: [], classification: "MNC"}
+  - {name: "BP", aliases: [], classification: "MNC"}
+  - {name: "Schlumberger", aliases: [], classification: "MNC"}
+  - {name: "DHL", aliases: [], classification: "MNC"}
+  - {name: "FedEx", aliases: [], classification: "MNC"}
+  - {name: "Maersk", aliases: [], classification: "MNC"}
+  - {name: "Walmart", aliases: [], classification: "MNC"}
+  - {name: "IKEA", aliases: [], classification: "MNC"}
+  - {name: "Decathlon", aliases: [], classification: "MNC"}
+  - {name: "HDFC Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "ICICI Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "State Bank of India", aliases: ["SBI"], classification: "Bank/Financial institution"}
+  - {name: "Axis Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Kotak Mahindra Bank", aliases: ["Kotak Bank"], classification: "Bank/Financial institution"}
+  - {name: "IndusInd Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Yes Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Bank of Baroda", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Punjab National Bank", aliases: ["PNB"], classification: "Bank/Financial institution"}
+  - {name: "Canara Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Union Bank of India", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "IDFC First Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Federal Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "RBL Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Bandhan Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Citibank", aliases: ["Citi"], classification: "Bank/Financial institution"}
+  - {name: "JPMorgan Chase", aliases: ["JP Morgan"], classification: "Bank/Financial institution"}
+  - {name: "Goldman Sachs", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Morgan Stanley", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Deutsche Bank", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "HSBC", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Standard Chartered", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Barclays", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "American Express", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Visa", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Mastercard", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Bajaj Finance", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Bajaj Finserv", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Muthoot Finance", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Piramal Finance", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "HDFC Life", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "ICICI Prudential", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "SBI Life", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Max Life", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "LIC of India", aliases: ["Life Insurance Corporation of India"], classification: "Bank/Financial institution"}
+  - {name: "Bajaj Allianz", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Tata AIG", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "HDFC Ergo", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Aditya Birla Capital", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Mahindra Finance", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Cholamandalam", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Shriram Finance", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "L&T Finance", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "HDFC Asset Management", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Nippon India Mutual Fund", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "SBI Mutual Fund", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Reserve Bank of India", aliases: ["RBI"], classification: "Bank/Financial institution"}
+  - {name: "NABARD", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "SIDBI", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Axis Max Life", aliases: [], classification: "Bank/Financial institution"}
+  - {name: "Deloitte", aliases: [], classification: "Consulting firm"}
+  - {name: "KPMG", aliases: [], classification: "Consulting firm"}
+  - {name: "EY", aliases: ["Ernst & Young"], classification: "Consulting firm"}
+  - {name: "PwC", aliases: ["PricewaterhouseCoopers"], classification: "Consulting firm"}
+  - {name: "McKinsey", aliases: ["McKinsey & Company"], classification: "Consulting firm"}
+  - {name: "Boston Consulting Group", aliases: ["BCG"], classification: "Consulting firm"}
+  - {name: "Bain & Company", aliases: ["Bain"], classification: "Consulting firm"}
+  - {name: "Kearney", aliases: ["A.T. Kearney"], classification: "Consulting firm"}
+  - {name: "Oliver Wyman", aliases: [], classification: "Consulting firm"}
+  - {name: "Arthur D. Little", aliases: [], classification: "Consulting firm"}
+  - {name: "Alvarez & Marsal", aliases: [], classification: "Consulting firm"}
+  - {name: "Grant Thornton", aliases: [], classification: "Consulting firm"}
+  - {name: "BDO", aliases: [], classification: "Consulting firm"}
+  - {name: "Mercer", aliases: [], classification: "Consulting firm"}
+  - {name: "Aon", aliases: [], classification: "Consulting firm"}
+  - {name: "Willis Towers Watson", aliases: [], classification: "Consulting firm"}
+  - {name: "Nielsen", aliases: [], classification: "Consulting firm"}
+  - {name: "Kantar", aliases: [], classification: "Consulting firm"}
+  - {name: "Gartner", aliases: [], classification: "Consulting firm"}
+  - {name: "Frost & Sullivan", aliases: [], classification: "Consulting firm"}
+  - {name: "ZS Associates", aliases: [], classification: "Consulting firm"}
+  - {name: "Evalueserve", aliases: [], classification: "Consulting firm"}
+  - {name: "Genpact", aliases: [], classification: "Consulting firm"}
+  - {name: "Wipro Consulting", aliases: [], classification: "Consulting firm"}
+  - {name: "Tata Consultancy Services", aliases: ["TCS"], classification: "Large Indian company"}
+  - {name: "Infosys", aliases: [], classification: "Large Indian company"}
+  - {name: "Wipro", aliases: [], classification: "Large Indian company"}
+  - {name: "HCLTech", aliases: ["HCL Technologies"], classification: "Large Indian company"}
+  - {name: "Tech Mahindra", aliases: [], classification: "Large Indian company"}
+  - {name: "Reliance Industries", aliases: ["Reliance"], classification: "Large Indian company"}
+  - {name: "Reliance Retail", aliases: [], classification: "Large Indian company"}
+  - {name: "Jio Platforms", aliases: ["Reliance Jio"], classification: "Large Indian company"}
+  - {name: "Adani Group", aliases: [], classification: "Large Indian company"}
+  - {name: "Adani Enterprises", aliases: [], classification: "Large Indian company"}
+  - {name: "Aditya Birla Group", aliases: [], classification: "Large Indian company"}
+  - {name: "Hindalco", aliases: [], classification: "Large Indian company"}
+  - {name: "Grasim", aliases: [], classification: "Large Indian company"}
+  - {name: "UltraTech Cement", aliases: [], classification: "Large Indian company"}
+  - {name: "Mahindra & Mahindra", aliases: ["Mahindra"], classification: "Large Indian company"}
+  - {name: "Bajaj Auto", aliases: [], classification: "Large Indian company"}
+  - {name: "Godrej", aliases: [], classification: "Large Indian company"}
+  - {name: "Godrej Consumer Products", aliases: [], classification: "Large Indian company"}
+  - {name: "ITC", aliases: [], classification: "Large Indian company"}
+  - {name: "Larsen & Toubro", aliases: ["L&T"], classification: "Large Indian company"}
+  - {name: "Tata Motors", aliases: [], classification: "Large Indian company"}
+  - {name: "Tata Steel", aliases: [], classification: "Large Indian company"}
+  - {name: "Tata Power", aliases: [], classification: "Large Indian company"}
+  - {name: "Tata Consumer Products", aliases: [], classification: "Large Indian company"}
+  - {name: "Titan Company", aliases: ["Titan"], classification: "Large Indian company"}
+  - {name: "Tata Communications", aliases: [], classification: "Large Indian company"}
+  - {name: "Asian Paints", aliases: [], classification: "Large Indian company"}
+  - {name: "Maruti Suzuki", aliases: [], classification: "Large Indian company"}
+  - {name: "Hero MotoCorp", aliases: [], classification: "Large Indian company"}
+  - {name: "Dabur", aliases: [], classification: "Large Indian company"}
+  - {name: "Marico", aliases: [], classification: "Large Indian company"}
+  - {name: "Britannia Industries", aliases: ["Britannia"], classification: "Large Indian company"}
+  - {name: "Havells", aliases: [], classification: "Large Indian company"}
+  - {name: "JSW Steel", aliases: [], classification: "Large Indian company"}
+  - {name: "JSW Group", aliases: [], classification: "Large Indian company"}
+  - {name: "Vedanta", aliases: [], classification: "Large Indian company"}
+  - {name: "Hindustan Zinc", aliases: [], classification: "Large Indian company"}
+  - {name: "ONGC", aliases: [], classification: "Large Indian company"}
+  - {name: "Indian Oil Corporation", aliases: ["IOCL"], classification: "Large Indian company"}
+  - {name: "BPCL", aliases: [], classification: "Large Indian company"}
+  - {name: "HPCL", aliases: [], classification: "Large Indian company"}
+  - {name: "GAIL", aliases: [], classification: "Large Indian company"}
+  - {name: "NTPC", aliases: [], classification: "Large Indian company"}
+  - {name: "Coal India", aliases: [], classification: "Large Indian company"}
+  - {name: "SAIL", aliases: [], classification: "Large Indian company"}
+  - {name: "BHEL", aliases: [], classification: "Large Indian company"}
+  - {name: "Bharti Airtel", aliases: ["Airtel"], classification: "Large Indian company"}
+  - {name: "Vodafone Idea", aliases: ["Vi"], classification: "Large Indian company"}
+  - {name: "Sun Pharma", aliases: [], classification: "Large Indian company"}
+  - {name: "Dr. Reddy's", aliases: ["Dr Reddys"], classification: "Large Indian company"}
+  - {name: "Cipla", aliases: [], classification: "Large Indian company"}
+  - {name: "Lupin", aliases: [], classification: "Large Indian company"}
+  - {name: "Zydus", aliases: [], classification: "Large Indian company"}
+  - {name: "Apollo Hospitals", aliases: [], classification: "Large Indian company"}
+  - {name: "Max Healthcare", aliases: [], classification: "Large Indian company"}
+  - {name: "Eicher Motors", aliases: [], classification: "Large Indian company"}
+  - {name: "TVS Motor", aliases: [], classification: "Large Indian company"}
+  - {name: "Ashok Leyland", aliases: [], classification: "Large Indian company"}
+  - {name: "Pidilite", aliases: [], classification: "Large Indian company"}
+  - {name: "Berger Paints", aliases: [], classification: "Large Indian company"}
+  - {name: "Kansai Nerolac", aliases: [], classification: "Large Indian company"}
+  - {name: "Amul", aliases: ["GCMMF"], classification: "Large Indian company"}
+  - {name: "Parle", aliases: [], classification: "Large Indian company"}
+  - {name: "Haldiram's", aliases: [], classification: "Large Indian company"}
+  - {name: "Patanjali", aliases: [], classification: "Large Indian company"}
+  - {name: "Emami", aliases: [], classification: "Large Indian company"}
+  - {name: "Bata India", aliases: [], classification: "Large Indian company"}
+  - {name: "Raymond", aliases: [], classification: "Large Indian company"}
+  - {name: "Page Industries", aliases: [], classification: "Large Indian company"}
+  - {name: "Avenue Supermarts", aliases: ["DMart"], classification: "Large Indian company"}
+  - {name: "Trent", aliases: [], classification: "Large Indian company"}
+  - {name: "Shoppers Stop", aliases: [], classification: "Large Indian company"}
+  - {name: "Future Group", aliases: [], classification: "Large Indian company"}
+  - {name: "Zydus Wellness", aliases: [], classification: "Large Indian company"}
+  - {name: "Info Edge", aliases: [], classification: "Large Indian company"}
+  - {name: "Bharat Forge", aliases: [], classification: "Large Indian company"}
+  - {name: "Cummins India", aliases: [], classification: "Large Indian company"}
+  - {name: "Voltas", aliases: [], classification: "Large Indian company"}
+  - {name: "Blue Star", aliases: [], classification: "Large Indian company"}
+  - {name: "Crompton", aliases: [], classification: "Large Indian company"}
+  - {name: "Polycab", aliases: [], classification: "Large Indian company"}
+  - {name: "Zoho", aliases: [], classification: "Established company"}
+  - {name: "Mphasis", aliases: [], classification: "Established company"}
+  - {name: "LTIMindtree", aliases: ["LTI Mindtree"], classification: "Established company"}
+  - {name: "Persistent Systems", aliases: [], classification: "Established company"}
+  - {name: "Coforge", aliases: [], classification: "Established company"}
+  - {name: "Hexaware", aliases: [], classification: "Established company"}
+  - {name: "Birlasoft", aliases: [], classification: "Established company"}
+  - {name: "Cyient", aliases: [], classification: "Established company"}
+  - {name: "KPIT", aliases: [], classification: "Established company"}
+  - {name: "Zensar", aliases: [], classification: "Established company"}
+  - {name: "Sonata Software", aliases: [], classification: "Established company"}

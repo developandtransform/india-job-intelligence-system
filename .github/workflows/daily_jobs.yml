@@ -1,0 +1,50 @@
+name: Daily job run
+
+on:
+  schedule:
+    - cron: "30 3 * * *"   # 03:30 UTC = 09:00 IST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (fetch and evaluate, write nothing, send no e-mail)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-jobs
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Recreate .env from the APP_ENV_FILE secret
+        env:
+          APP_ENV_FILE: ${{ secrets.APP_ENV_FILE }}
+        run: |
+          if [ -z "$APP_ENV_FILE" ]; then echo "::error::Secret APP_ENV_FILE is not set"; exit 1; fi
+          umask 077
+          printf '%s\n' "$APP_ENV_FILE" > .env
+          # mask every value so it can never appear in the logs
+          while IFS= read -r line; do
+            case "$line" in ''|\#*) continue ;; esac
+            val="${line#*=}"; val="${val%\"}"; val="${val#\"}"
+            [ ${#val} -ge 4 ] && echo "::add-mask::$val"
+          done < .env
+      - name: Run
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then python main.py run --dry-run; else python main.py run; fi
+      - name: Remove .env
+        if: always()
+        run: rm -f .env

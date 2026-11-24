@@ -1,0 +1,12 @@
+# Runtime dependencies (versions in comments were the ones present when this project was built and tested)
+python-jobspy>=1.5.0        # Naukri / LinkedIn / Indeed / Glassdoor / Google scraping (MIT)  [tested 1.5.0]
+urllib3>=2.0.0            # retry jitter / Retry-After cap need urllib3 2.x                  [tested 2.8.0]
+requests>=2.31.0            # HTTP for ATS APIs, Apify REST API, Gemini REST API              [tested 2.34.2]
+beautifulsoup4>=4.12.2      # HTML parsing for career pages                                     [tested 4.15.0]
+python-dotenv>=1.0.0        # reads the single root .env file                                  [tested 1.2.3]
+gspread>=6.0.0              # Google Sheets API client                                          [tested 6.2.1]
+google-auth>=2.20.0         # service-account authentication                                   [tested 2.63.1]
+rapidfuzz>=3.0.0            # fuzzy matching for de-duplication                                [tested 3.14.6]
+tenacity>=8.2.0             # retry with exponential back-off                                  [tested 9.2.1]
+PyYAML>=6.0                 # config/targets.yaml and config/company_seed.yaml
+tzdata>=2023.3              # IANA timezones on Windows (Asia/Kolkata)
