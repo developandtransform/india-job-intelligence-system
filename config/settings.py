@@ -12,6 +12,7 @@ import io
 
 import base64
 import json
+import re
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -43,6 +44,20 @@ def _int(value: str | None, default: int) -> int:
     return int(_num(value, default))
 
 
+def parse_token_list(value) -> list[str]:
+    """APIFY_TOKENS -> clean list: split on commas and newlines (a list/tuple is accepted too), strip whitespace and
+    surrounding quotes, ignore empty entries, drop duplicates (first occurrence wins, so the order is stable)."""
+    if not value:
+        return []
+    parts = re.split(r"[,\r\n]+", value) if isinstance(value, str) else [str(v) for v in value if v]
+    out: list[str] = []
+    for part in parts:
+        tok = part.strip().strip("\"'").strip()
+        if tok and tok not in out:
+            out.append(tok)
+    return out
+
+
 def _json_obj(value: str | None) -> dict:
     if not value or not value.strip():
         return {}
@@ -70,7 +85,8 @@ class Settings:
     email_max_jobs_total: int = 40            # whole digest; higher-priority sections fill it first
     email_max_jobs_per_category: int = 15
     # --- Apify ---
-    apify_token: str = ""
+    apify_token: str = ""                       # legacy single token (APIFY_TOKEN); still honoured
+    apify_tokens: tuple[str, ...] = ()           # APIFY_TOKENS: any number of tokens, tried in rotation (see apify_token_list)
     apify_enabled: bool = False
     apify_enable: dict[str, bool] = field(default_factory=dict)
     apify_max_results: dict[str, int] = field(default_factory=dict)
@@ -167,10 +183,17 @@ class Settings:
             raise ValueError("The decoded JSON is not a Google service-account key (missing client_email).")
         return info
 
+    @property
+    def apify_token_list(self) -> tuple[str, ...]:
+        """The tokens in use: APIFY_TOKENS if it holds any valid token, otherwise the legacy APIFY_TOKEN. Cleaned and
+        de-duplicated even when Settings is built by hand."""
+        tokens = parse_token_list(self.apify_tokens) or parse_token_list(self.apify_token)
+        return tuple(tokens)
+
     def secret_values(self) -> list[str]:
         """Values that must never appear in logs."""
         vals = [self.google_service_account_json_base64, self.gmail_app_password,
-                self.apify_token, self.gemini_api_key, self.groq_api_key,
+                *self.apify_token_list, self.apify_token, *self.apify_tokens, self.gemini_api_key, self.groq_api_key,
                 self.cloudflare_api_token, self.openrouter_api_key, self.custom_api_key]
         try:
             info = self.service_account_info()
@@ -181,7 +204,7 @@ class Settings:
 
     def enabled_apify_actors(self) -> list[str]:
         """Actors that are allowed to run. All gates must be open (see docs/CONFIGURATION.md)."""
-        if not (self.apify_enabled and self.apify_token and self.apify_approved_max_usd_per_run > 0):
+        if not (self.apify_enabled and self.apify_token_list and self.apify_approved_max_usd_per_run > 0):
             return []
         return [a for a in APIFY_ACTORS if self.apify_enable.get(a)]
 
@@ -238,8 +261,8 @@ class Settings:
                 if not val:
                     problems.append(f"{name} is empty (needed to send the email digest).")
         problems += self.ai_problems()
-        if self.apify_enabled and not self.apify_token:
-            problems.append("APIFY_ENABLED=true but APIFY_TOKEN is empty - Apify will be skipped.")
+        if self.apify_enabled and not self.apify_token_list:
+            problems.append("APIFY_ENABLED=true but neither APIFY_TOKENS nor APIFY_TOKEN is set - Apify will be skipped.")
         if self.apify_enabled and self.apify_approved_max_usd_per_run <= 0:
             problems.append("APIFY_ENABLED=true but APIFY_APPROVED_MAX_USD_PER_RUN is 0 - Apify will be skipped.")
         return problems
@@ -286,6 +309,7 @@ def load_settings(env_path: Path | None = None, environ: dict[str, str] | None =
         email_max_jobs_per_category=_int(g("EMAIL_MAX_JOBS_PER_CATEGORY"), 15),
         email_max_jobs_total=max(1, _int(g("EMAIL_MAX_JOBS_TOTAL"), 40)),
         apify_token=(g("APIFY_TOKEN") or "").strip(),
+        apify_tokens=tuple(parse_token_list(g("APIFY_TOKENS"))),
         apify_enabled=_truthy(g("APIFY_ENABLED"), False),
         apify_enable={a: _truthy(g(f"APIFY_ENABLE_{a.upper()}"), False) for a in APIFY_ACTORS},
         apify_max_results={a: max(1, _int(g(f"APIFY_MAX_RESULTS_{a.upper()}"), 50)) for a in APIFY_ACTORS},

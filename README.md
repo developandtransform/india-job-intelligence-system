@@ -361,7 +361,7 @@ Each is optional and skipped when it has no key. Python rules always run first a
 answers are cached in the "AI Cache" tab. Full guide, limits and troubleshooting: [docs/AI_PROVIDERS.md](docs/AI_PROVIDERS.md).
 
 ```powershell
-python main.py show-config   # which models are really in effect (no secrets)
+python main.py show-config   # which models are really in effect + how many Apify tokens (never their values)
 python main.py check-ai      # tiny real test of every enabled provider
 ```
 
@@ -448,4 +448,9 @@ Provided as is, without warranty. Job-board terms of service may restrict automa
 - **`COMPANY_SEED_MODE=strict` is the default.** Unverified seed data never counts as verified evidence. Startups need age >= 5 and >= 90 employees; unknown values mean *Company Verification Required*.
 - **Apify** stays off by default and is gated by Dry Run, the master switch, token, approved budget, per-actor switch and spending caps; a failed call is never retried as a new paid run.
 - **AI function labels are checked.** A suggested function needs at least 2 of its own keywords in the posting to be accepted; 1 keyword = kept as "(unverified)" with the lowest score and a flag; 0 = rejected.
-- **Test it:** `python -m pytest -q` (383 tests, all offline/mocked; the 5 workflow-script tests need `bash` and skip without it), `python -m compileall -q .`, `python main.py demo`.
+- **Test it:** `python -m pytest -q` (419 tests, all offline/mocked; the 5 workflow-script tests need `bash` and skip without it), `python -m compileall -q .`, `python main.py demo`.
+
+
+## 22. Multiple Apify tokens
+
+`APIFY_TOKENS=TOKEN_1,TOKEN_2,TOKEN_3` in `.env` / `APP_ENV_FILE` enables round-robin rotation (one token per Actor run, kept for that run's whole life) and safe failover (only on 401/403/429, never after a timeout or server error, so no duplicate paid run). `APIFY_TOKEN` still works as the fallback. Spending limits are shared by all tokens, Dry Run never starts an Actor, and tokens of one Apify account share that account's credits. Details: [docs/CONFIGURATION.md](docs/CONFIGURATION.md#multiple-apify-tokens-rotation-and-failover).

@@ -58,3 +58,11 @@ Start with `python main.py show-config` then `python main.py check-ai`.
 | Many jobs now say Company Verification Required | Strict mode is the default. Verify the companies in the Company Registry tab, or check that your `.env`/`APP_ENV_FILE` has no old `COMPANY_SEED_MODE=flag`. |
 | Function shows "(unverified)" | The AI suggested a function but the posting has only one supporting term; check the role yourself. |
 | Apify did not run | Dry run, `APIFY_ENABLED` off, no token/budget, or the actor not enabled. See docs/CONFIGURATION.md. |
+
+## Apify tokens
+| Symptom | Fix |
+|---|---|
+| "no Apify token was accepted" in Source Statistics | Every token was refused (401 invalid, 403 no permission, 429 rate limit). Nothing was started or charged. Check the tokens in the Apify console and `APIFY_TOKENS` in `APP_ENV_FILE`. |
+| Apify says "stopped after an error (no retry of paid runs)" | A timeout/server error made it unclear whether a run started; the maximum possible cost was counted and nothing was retried. Look at your Apify console for a run. |
+| Several tokens but credit runs out as if there were one | Tokens of the same Apify account share its credit. |
+| `show-config` prints `Apify tokens configured = 0` | `APIFY_TOKENS` and `APIFY_TOKEN` are both empty in the `.env` that was loaded. |

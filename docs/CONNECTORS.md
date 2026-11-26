@@ -34,7 +34,7 @@ Edit `config/targets.yaml` or set `ATS_BOARDS_EXTRA` (comma separated), e.g. `gr
 | `google_jobs` | belcaidsaad/job-scraper-with-hiring-urgency-company-size-saad-belcaid | usage-priced; $0.10/run assumed |
 | `workday` | fantastic-jobs/workday-jobs-api | ~$0.0012/result; actor minimum 200 jobs |
 
-Prices were read from the actor pages on 2026-11-24 and **may be wrong or change**; the real `usageTotalUsd` returned by Apify is recorded in *Source Statistics*. An actor runs only if `APIFY_ENABLED=true`, `APIFY_TOKEN` is set, `APIFY_APPROVED_MAX_USD_PER_RUN>0` and its own `APIFY_ENABLE_<NAME>=true`. The result limit is lowered so the estimate fits the remaining budget, and `maxItems` and `maxTotalChargeUsd` are sent with every run. Remember Apify also bills compute/proxy usage separately; set a monthly cap in the Apify console as well.
+Prices were read from the actor pages on 2026-11-24 and **may be wrong or change**; the real `usageTotalUsd` returned by Apify is recorded in *Source Statistics*. An actor runs only if `APIFY_ENABLED=true`, a token is set (`APIFY_TOKENS`, or the legacy `APIFY_TOKEN`), `APIFY_APPROVED_MAX_USD_PER_RUN>0` and its own `APIFY_ENABLE_<NAME>=true`. The result limit is lowered so the estimate fits the remaining budget, and `maxItems` and `maxTotalChargeUsd` are sent with every run. Remember Apify also bills compute/proxy usage separately; set a monthly cap in the Apify console as well.
 
 
 ## Finding more Indian employer boards (verified, never guessed into the config)

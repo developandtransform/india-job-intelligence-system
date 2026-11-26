@@ -1,6 +1,6 @@
 # Improvement report (AI hotfix, multi-provider, usage reduction, reliability)
 
-Test status when written: **383 passed** (293 before the final safety patch), `compileall` clean, `python main.py demo` runs. Every AI, Sheets, Gmail and discovery
+Test status when written: **419 passed** (293 before the final safety patch), `compileall` clean, `python main.py demo` runs. Every AI, Sheets, Gmail and discovery
 test uses fakes or mocks. **No live request was made to Gemini, Groq, Cloudflare, OpenRouter, Google Sheets, Gmail, GitHub or any job site.**
 
 ## Tested and working (offline, real code paths)
@@ -61,3 +61,6 @@ See README section 21 and `docs/AI_PROVIDERS.md`. Free AI limits are provider-co
 - **Hardcoded path removed** from `test_dry_run_safety.py` (now relative to the test file). The whole suite was searched for other absolute paths (none left); file reads in tests are explicitly UTF-8 so Windows code pages cannot break them.
 - **Case-sensitive gate** (see item 1 above). The five tests that execute the workflow shell scripts need `bash` (present on GitHub Ubuntu runners, Git for Windows and WSL) and are skipped, not failed, when it is missing.
 - **Complete Dry Run structure validation**: required headers are now checked for All Jobs, Company Registry, Source Statistics, System Logs and every generated view. Extra user columns are allowed; missing tabs, empty or blank header rows and missing columns are reported per tab; nothing is modified. The optional AI Cache tab is checked only when it exists and AI is in use, and a missing cache tab never blocks a run.
+
+## Multiple Apify tokens
+`APIFY_TOKENS` (comma/newline separated, cleaned, de-duplicated) with `APIFY_TOKEN` as the fallback; all are in `secret_values()`. `TokenPool` rotates round-robin per run and is thread-safe. Failover only on 401/403/429 (proof that no run exists), at most one attempt per token; timeouts, connection errors, 5xx and unreadable answers never start another run and record the maximum cost (unchanged fail-closed rule). A run keeps its token for polling, abort and dataset. The spending tracker, caps, result limits and dry-run guards are untouched. Tested with mocks only (`tests/test_apify_multi_token.py`, 36 tests); **no real Apify call was made**, so real Apify behaviour for these status codes is implemented but not live-tested.

@@ -65,7 +65,7 @@ Keys, bearer tokens and `key=` URLs are redacted automatically.
 ## Commands
 
 ```powershell
-python main.py show-config   # prints which models/providers are really in effect (no secrets)
+python main.py show-config   # prints which models/providers are really in effect, then the number of Apify tokens (no secrets)
 python main.py check-ai      # one tiny real request to EACH enabled provider, one by one
 ```
 

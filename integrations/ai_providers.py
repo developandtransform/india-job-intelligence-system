@@ -171,7 +171,7 @@ class Provider:
 
     def _backoff(self, attempt: int) -> float:
         return min(self.backoff_max, self.backoff_base * (2 ** attempt)) * (0.5 + self._rand())      # jitter 0.5x-1.5x, then capped
-
+    
     def complete_json(self, prompt: str) -> dict:
         """Return the model's answer as a dict or raise AIError. Retries only temporary problems."""
         try:

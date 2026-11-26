@@ -2,7 +2,7 @@
 
 An actor runs only when ALL of these are true (see ``Settings.enabled_apify_actors``):
   1. APIFY_ENABLED=true                         (master switch)
-  2. APIFY_TOKEN is set
+  2. at least one token is set (APIFY_TOKENS, or the legacy APIFY_TOKEN)
   3. APIFY_ENABLE_<ACTOR>=true                  (per-actor switch)
   4. APIFY_APPROVED_MAX_USD_PER_RUN > 0         (your explicit spending approval for one daily run)
 
@@ -20,6 +20,7 @@ Apify's current price always applies - check the Actor's Pricing tab before enab
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -223,6 +224,57 @@ ACTORS: dict[str, ActorSpec] = {
 }
 
 
+# Responses that prove NO run was created because the request itself was refused. Only these allow trying another token.
+FAILOVER_STATUSES = frozenset({401, 403, 429})
+
+
+class ApifyStartRejected(RuntimeError):
+    """Every configured token was refused (401/403/429) before any run existed: nothing was started, nothing can be billed."""
+
+
+class TokenPool:
+    """Round-robin Apify tokens. Thread-safe. Tokens are only ever handled by index in logs and messages.
+
+    * ``start_order()`` gives the tokens to try for ONE new run: starting at the rotating cursor, each token at most once.
+    * after a successful start ``started_with(i)`` moves the cursor to the NEXT token, so run 1 uses A, run 2 B, run 3 C, run 4 A.
+    * a token refused with 401/403 is skipped for the rest of this execution; one refused with 429 is tried last next time.
+    * the token that started a run must be used for that run's polling / abort / dataset: callers keep the index.
+    """
+
+    def __init__(self, tokens) -> None:
+        self._tokens = tuple(tokens)
+        self._cursor = 0
+        self._rejected: set[int] = set()      # 401 / 403
+        self._limited: set[int] = set()       # 429
+        self._lock = threading.Lock()
+
+    def __len__(self) -> int:
+        return len(self._tokens)
+
+    def token(self, index: int) -> str:
+        return self._tokens[index]
+
+    def start_order(self) -> list[int]:
+        with self._lock:
+            n = len(self._tokens)
+            order = [(self._cursor + k) % n for k in range(n)] if n else []
+            usable = [i for i in order if i not in self._rejected]
+            return [i for i in usable if i not in self._limited] + [i for i in usable if i in self._limited]
+
+    def started_with(self, index: int) -> None:
+        with self._lock:
+            self._limited.discard(index)
+            self._cursor = (index + 1) % len(self._tokens)
+
+    def mark_refused(self, index: int, status: int) -> None:
+        with self._lock:
+            (self._limited if status == 429 else self._rejected).add(index)
+
+    def usable(self) -> int:
+        with self._lock:
+            return len(self._tokens) - len(self._rejected)
+
+
 @dataclass
 class SpendTracker:
     approved_usd: float
@@ -258,12 +310,38 @@ class ApifyConnector(Connector):
         super().__init__(settings, http)
         self.tracker = SpendTracker(settings.apify_approved_max_usd_per_run, settings.apify_max_usd_per_actor)
         self.per_actor_stats: dict[str, dict] = {}
+        self.pool = TokenPool(getattr(settings, "apify_token_list", None) or ((settings.apify_token,) if settings.apify_token else ()))
+
+    def _redact(self, text: str) -> str:
+        """Safety net: no configured token may ever appear in an error message."""
+        for i in range(len(self.pool)):
+            text = text.replace(self.pool.token(i), f"<apify token #{i + 1}>")
+        return text
 
     def enabled(self) -> bool:
         return bool(self.settings.enabled_apify_actors())
 
-    def _headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.settings.apify_token}", "Content-Type": "application/json"}
+    def _headers(self, index: int = 0) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self.pool.token(index)}", "Content-Type": "application/json"}
+
+    def _start_run(self, actor: str, params: dict, payload: dict) -> tuple[dict, int]:
+        """Start ONE run. Returns (run data, index of the token that started it). Failover to the next token happens only when a
+        token was explicitly refused (401/403/429), which proves no run was created. A timeout, a connection error, a 5xx or an
+        unreadable answer is ambiguous (a paid run may exist), so it propagates: the caller records the maximum cost and stops."""
+        refused: list[str] = []
+        for idx in self.pool.start_order():                  # each configured token at most once
+            resp = self.http.post(f"{API}/acts/{actor}/runs", params=params, json=payload, headers=self._headers(idx))
+            status = getattr(resp, "status_code", 0)
+            if status in FAILOVER_STATUSES:
+                self.pool.mark_refused(idx, status)
+                refused.append(f"token #{idx + 1}: HTTP {status}")
+                log.warning("Apify token #%d refused with HTTP %d before any run was created; trying the next token", idx + 1, status)
+                continue
+            resp.raise_for_status()
+            run = resp.json()["data"]
+            self.pool.started_with(idx)
+            return run, idx
+        raise ApifyStartRejected("no Apify token was accepted (" + ("; ".join(refused) or "none usable") + ")")
 
     def _run_actor(self, spec: ActorSpec, payload: dict, limit: int, max_usd: float, deadline: float) -> tuple[list[dict], float, str]:
         if getattr(self.settings, "dry_run", False):
@@ -271,23 +349,29 @@ class ApifyConnector(Connector):
         actor = spec.actor_id.replace("/", "~")
         timeout = int(min(self.settings.apify_run_timeout_seconds, max(30, deadline - time.monotonic())))
         params = {"maxItems": limit, "maxTotalChargeUsd": max_usd, "timeout": timeout}
-        resp = self.http.post(f"{API}/acts/{actor}/runs", params=params, json=payload, headers=self._headers())
-        resp.raise_for_status()
-        run = resp.json()["data"]
+        run, idx = self._start_run(actor, params, payload)
         run_id, status = run["id"], run.get("status", "READY")
-        while status not in self.TERMINAL:
-            if time.monotonic() > deadline:
-                self.http.post(f"{API}/actor-runs/{run_id}/abort", headers=self._headers())
-                status = "ABORTED"
-                break
-            time.sleep(5)
-            run = self.http.get(f"{API}/actor-runs/{run_id}", headers=self._headers()).json()["data"]
-            status = run.get("status", status)
+        hdr = self._headers(idx)            # the SAME token for the whole life of this run: poll, abort, dataset
+        try:
+            while status not in self.TERMINAL:
+                if time.monotonic() > deadline:
+                    self.http.post(f"{API}/actor-runs/{run_id}/abort", headers=hdr)
+                    status = "ABORTED"
+                    break
+                time.sleep(5)
+                run = self.http.get(f"{API}/actor-runs/{run_id}", headers=hdr).json()["data"]
+                status = run.get("status", status)
+        except Exception:
+            try:       # best effort: stop a run we can no longer watch (same token). The actor is NEVER started again.
+                self.http.post(f"{API}/actor-runs/{run_id}/abort", headers=hdr)
+            except Exception:  # noqa: BLE001
+                pass
+            raise
         cost = float(run.get("usageTotalUsd") or 0.0)
         items: list[dict] = []
         if run.get("defaultDatasetId"):
             r = self.http.get(f"{API}/datasets/{run['defaultDatasetId']}/items", params={"format": "json", "clean": "true", "limit": limit},
-                              headers=self._headers())
+                              headers=hdr)
             r.raise_for_status()
             data = r.json()
             items = data[:limit] if isinstance(data, list) else []      # never accept more rows than the approved limit
@@ -311,8 +395,13 @@ class ApifyConnector(Connector):
                 payload = {**spec.build_input(term, limit), **s.apify_input_json.get(key, {})}
                 try:
                     items, cost, status = self._run_actor(spec, payload, limit, max_usd, deadline)
+                except ApifyStartRejected as exc:
+                    # Every token was refused before a run existed: nothing was started, so nothing is charged. Stop this actor.
+                    result.errors.append(f"apify:{key} '{term}': {self._redact(str(exc))}")
+                    stats["skipped"] = "all Apify tokens refused (no run started, no cost)"
+                    break
                 except Exception as exc:  # noqa: BLE001
-                    result.errors.append(f"apify:{key} '{term}': {type(exc).__name__}: {str(exc)[:200]}")
+                    result.errors.append(f"apify:{key} '{term}': {type(exc).__name__}: {self._redact(str(exc))[:200]}")
                     # FAIL SAFE: after an error we cannot know whether a paid run was started (e.g. the answer was lost).
                     # Count the most it could have cost and do NOT start another run for this actor - no automatic retry.
                     self.tracker.record(key, max_usd)

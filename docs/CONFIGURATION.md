@@ -13,7 +13,8 @@ There is **one** configuration file: `.env` in the project root (copy `.env.exam
 | `EMAIL_MAX_JOBS_PER_CATEGORY` | 15 | Cap per section; jobs cut by the cap appear the next day |
 | `EMAIL_MAX_JOBS_TOTAL` | 40 | Cap for the whole digest. Higher-priority sections fill it first; the rest wait until tomorrow |
 | `APIFY_ENABLED` | false | Master switch |
-| `APIFY_TOKEN` | – | Apify API token |
+| `APIFY_TOKENS` | – | One or more Apify API tokens, comma- or newline-separated (`TOKEN_1,TOKEN_2,TOKEN_3`). Whitespace and empty entries are ignored, duplicates removed |
+| `APIFY_TOKEN` | – | Legacy single token. Used only when `APIFY_TOKENS` is empty, so old installations keep working unchanged |
 | `APIFY_ENABLE_LINKEDIN/NAUKRI/IIMJOBS/GLASSDOOR/GOOGLE_JOBS/WORKDAY` | false | Per-actor switch |
 | `APIFY_APPROVED_MAX_USD_PER_RUN` | 0 | Your explicit budget for one daily run, all actors together. 0 = nothing runs |
 | `APIFY_MAX_USD_PER_ACTOR` | 0.50 | Ceiling for one actor (sent as `maxTotalChargeUsd`) |
@@ -50,3 +51,20 @@ Older `.env` files may contain `COMPANY_SEED_MODE=flag`; an explicit value overr
 
 ## Apify spending protection
 Apify runs only when ALL are true: not a dry run, `APIFY_ENABLED=true`, a token is set, an approved per-run budget > 0, and the specific actor is enabled. Per-run and per-actor spending caps are checked before each start and sent to Apify as limits. POST requests are never auto-retried, and after any error in an actor the connector stops (it records the maximum possible cost instead of trying again). Invalid values leave it disabled.
+
+## Multiple Apify tokens (rotation and failover)
+**Configure.** In `.env` (and in the GitHub secret `APP_ENV_FILE`): `APIFY_TOKENS=TOKEN_1,TOKEN_2,TOKEN_3`. Commas or one token per line; spaces, quotes and empty entries are ignored and duplicates are removed. Leave `APIFY_TOKEN` blank, or keep it: it is a **fallback used only when `APIFY_TOKENS` is empty**, so an installation that only has `APIFY_TOKEN` works exactly as before. Every token is treated as a secret and masked in logs; messages and reports refer to "token #2", never the value. `python main.py show-config` prints the number of tokens (after cleaning and de-duplication, e.g. `Apify tokens configured = 3`) - never a token value, prefix or suffix. It makes no Apify call.
+
+**Rotation.** Each new Actor run starts with the next token: run 1 uses A, run 2 B, run 3 C, run 4 A again. A token rejected with 401/403 is skipped for the rest of that execution; one that returned 429 is tried last. A single token simply is used every time.
+
+**One token per run.** The token that started a run is used for everything about that run - polling, abort and dataset download - because tokens may belong to different Apify accounts and cannot see each other's runs. A run is never moved to another token.
+
+**Failover.** If starting an Actor is refused with **401, 403 or 429**, no run was created, so the next token is tried (at most once per token per start). Anything ambiguous never triggers another start: a timeout, a connection error, a 5xx answer or an unreadable answer might mean the run exists. In that case the connector records the **maximum possible cost** for that Actor (existing fail-closed rule), stops that Actor and does not retry. If polling or the dataset download fails after a successful start, the Actor is **not** started again (the connector tries to abort that run with the same token).
+
+**When all tokens fail.** If every token is refused (401/403/429) before any run exists, nothing was started and nothing is charged: the Actor is skipped, a message "no Apify token was accepted" appears in Source Statistics, and the rest of the pipeline continues. The monitoring alert for a failing source applies as usual.
+
+**Spending is not multiplied.** `APIFY_APPROVED_MAX_USD_PER_RUN`, `APIFY_MAX_USD_PER_ACTOR`, `APIFY_MAX_RESULTS_<ACTOR>` and the timeout are shared by all tokens; switching token never resets the spending tracker. Dry Run never starts an Actor, whatever the number of tokens.
+
+**Credits.** Tokens from the **same** Apify account share that account's monthly credits and usage allowance - extra tokens do **not** add credit. Rotation helps only when tokens belong to different accounts (each with its own allowance) or to survive a revoked token. Check the terms of each account you use.
+
+**Updating `APP_ENV_FILE`.** Edit your local `.env` (add the `APIFY_TOKENS=` line), copy the whole file, then GitHub > repository > *Settings > Secrets and variables > Actions > Secrets > APP_ENV_FILE > Update* and paste it. Nothing else changes; the workflow already rebuilds `.env` from that secret and masks the values.

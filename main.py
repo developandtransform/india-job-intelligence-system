@@ -6,7 +6,7 @@
   python main.py check-ai  send one tiny real request to the AI provider(s)
   python main.py discover-boards  verify candidate ATS boards (writes a CSV to review; edits nothing)
   python main.py registry-queue   companies to verify first, by number of relevant jobs
-  python main.py show-config  print non-secret AI settings in effect
+  python main.py show-config  print non-secret AI settings and the number of Apify tokens (never their values)
   python main.py run       the real daily run
   python main.py run --dry-run   fetch + evaluate, write nothing, send nothing
 """
@@ -86,6 +86,7 @@ def cmd_check(args) -> int:
         print("Google Sheets check FAILED:", exc)
         return 1
     print("Google Sheets OK:", store.url())
+    print("Apify tokens configured:", len(settings.apify_token_list), "(values never shown)")
     print("Apify actors allowed to run:", settings.enabled_apify_actors() or "none (disabled by default)")
     return 0 if not problems else 1
 
@@ -160,7 +161,10 @@ def _skip_reason(settings, name: str) -> str:
 
 
 def cmd_show_config(args) -> int:
-    """Print the non-secret AI settings that are really in effect (safe to show in GitHub Actions logs)."""
+    """Print the non-secret AI settings that are really in effect, then how many Apify tokens are configured.
+
+    Only the COUNT of Apify tokens is printed - never a token value, a prefix, a suffix or a length. Safe to show in
+    GitHub Actions logs."""
     settings = load_settings()
     print("AI settings in effect (keys are never printed):")
     print(f"  AI_ENABLED        = {settings.ai_enabled}")
@@ -175,6 +179,8 @@ def cmd_show_config(args) -> int:
         print(f"  {name:<10} enabled={str(c['enabled']):<5} model={c['model']}  {key}{extra}  max_calls/run={c['max_calls']}")
     for p in settings.ai_problems():
         print("  PROBLEM:", p)
+    print("Apify settings in effect (token values are never printed):")
+    print(f"  Apify tokens configured = {len(settings.apify_token_list)}")
     return 0
 
 
