@@ -43,6 +43,20 @@ def _kw_regex(kw: str) -> re.Pattern:
 _IRRELEVANT = [re.compile(p, re.I) for p in IRRELEVANT_TITLE_PATTERNS]
 
 
+def function_evidence(label: str, title: str, description: str) -> list[str]:
+    """Deterministic support for a function label that an AI suggested: the distinct keywords of THAT function found in the
+    posting. Overlapping matches count once (the longest wins), so "digital marketing" is one piece of evidence, not two."""
+    if label not in FUNCTIONS or label == "Other Management":
+        return []
+    text = f"{title or ''}\n{(description or '')[:6000]}".lower()
+    spans: list[tuple[int, int, str]] = []
+    for kw in sorted(FUNCTIONS[label][1], key=len, reverse=True):
+        for m in _kw_regex(kw).finditer(text):
+            if not any(m.start() < e and s_ < m.end() for s_, e, _ in spans):
+                spans.append((m.start(), m.end(), kw.lower()))
+    return sorted({kw for _, _, kw in spans})
+
+
 def detect_function(title: str, description: str = "") -> FunctionMatch:
     t = (title or "").lower()
     irrelevant = any(rx.search(t) for rx in _IRRELEVANT)

@@ -18,7 +18,7 @@ def test_defaults_without_any_env_file():
     s = load_settings(environ={}, env_path=Path("/nonexistent/.env"))
     assert (s.minimum_ctc_lpa, s.maximum_experience_years, s.startup_min_age_years, s.startup_min_employees) == (8.0, 3.0, 5.0, 90)
     assert s.minimum_internship_stipend_inr_monthly == 10000
-    assert not s.apify_enabled and s.enabled_apify_actors() == [] and s.company_seed_mode == "flag"
+    assert not s.apify_enabled and s.enabled_apify_actors() == [] and s.company_seed_mode == "strict"
 
 
 def test_env_file_is_read_and_real_environment_overrides_it(tmp_path):

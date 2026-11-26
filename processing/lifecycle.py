@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from config.settings import Settings
-from core.models import Job
+from core.models import MAX_CELL_CHARS, Job
 from core.textutil import norm_company, norm_text, short_hash
 from processing.deduplication import JobIndex, dedupe_batch, merge_into, sources_label
 from processing.eligibility import EvalContext, evaluate_job, is_out_of_scope
@@ -47,9 +47,27 @@ def _bump(d: dict[str, int], k: str) -> None:
     d[k] = d.get(k, 0) + 1
 
 
+def _refresh_text_if_edited(existing: Job, inc: Job) -> None:
+    """The employer edited the SAME posting (same source key): take the new text so salary / experience / location changes
+    are noticed and re-evaluated. Guards against flapping: only the same source, and never a much shorter text (a
+    list-page snippet replacing a full description). Hints from that fresh sighting travel with the text."""
+    if not (set(inc.source_keys) & set(existing.source_keys)):
+        return
+    new = (inc.full_description or inc.description or "")
+    old = (existing.full_description or existing.description or "")
+    if not new or not old or new[:MAX_CELL_CHARS] == old[:MAX_CELL_CHARS] or len(new) < 0.6 * len(old):
+        return
+    existing.full_description = existing.description = new
+    existing.hint_salary, existing.hint_exp_text = inc.hint_salary or existing.hint_salary, inc.hint_exp_text or existing.hint_exp_text
+    if inc.hint_exp_min is not None or inc.hint_exp_max is not None:
+        existing.hint_exp_min, existing.hint_exp_max = inc.hint_exp_min, inc.hint_exp_max
+    existing.dirty = True
+
+
 def _refresh_from_incoming(existing: Job, inc: Job, today: str) -> None:
     """Update an existing master job with a fresh sighting."""
     before = existing.content_hash
+    _refresh_text_if_edited(existing, inc)
     merge_into(existing, inc)
     if inc.title and inc.title != existing.title:
         existing.title = inc.title

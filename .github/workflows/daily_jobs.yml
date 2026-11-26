@@ -5,10 +5,13 @@ on:
     - cron: "30 3 * * *"   # 03:30 UTC = 09:00 IST
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Dry run (fetch and evaluate, write nothing, send no e-mail)"
-        type: boolean
-        default: false
+      mode:
+        description: "dry-run = read-only test (default). production = writes to the Sheet and sends the e-mail."
+        type: choice
+        options:
+          - dry-run
+          - production
+        default: dry-run
 
 permissions:
   contents: read
@@ -18,7 +21,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    # SAFETY GATE. GitHub expression comparisons (==) ignore letter case, so the variable is NOT compared in an expression.
+    # The raw value is passed in the environment and compared by the shell: only exactly lowercase "true" opens the gate.
+    # Missing, empty, TRUE, True, " true", "true " or anything else -> "false".
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      scheduled_enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check ENABLE_SCHEDULED_PRODUCTION (exact lowercase true)
+        id: check
+        env:
+          ENABLE_SCHEDULED_PRODUCTION: ${{ vars.ENABLE_SCHEDULED_PRODUCTION }}
+        run: |
+          if [ "$ENABLE_SCHEDULED_PRODUCTION" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Scheduled production is ENABLED"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Scheduled production is NOT enabled (repository variable ENABLE_SCHEDULED_PRODUCTION is not exactly 'true')"
+          fi
   run:
+    # A manual run is always allowed (it defaults to dry-run). A scheduled run needs the gate output to be "true".
+    # The output only ever holds "true" or "false", so the expression comparison below cannot be fooled by letter case.
+    needs: gate
+    if: github.event_name == 'workflow_dispatch' || needs.gate.outputs.scheduled_enabled == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -36,15 +64,35 @@ jobs:
           if [ -z "$APP_ENV_FILE" ]; then echo "::error::Secret APP_ENV_FILE is not set"; exit 1; fi
           umask 077
           printf '%s\n' "$APP_ENV_FILE" > .env
-          # mask every value so it can never appear in the logs
+          # Mask only values that look like secrets (keys, tokens, passwords, IDs, addresses). Harmless settings such as
+          # GEMINI_MODEL stay visible, so the log shows which model is really being used.
           while IFS= read -r line; do
             case "$line" in ''|\#*) continue ;; esac
-            val="${line#*=}"; val="${val%\"}"; val="${val#\"}"
-            [ ${#val} -ge 4 ] && echo "::add-mask::$val"
+            name="${line%%=*}"; val="${line#*=}"; val="${val%\"}"; val="${val#\"}"
+            case "$name" in
+              *KEY*|*TOKEN*|*PASSWORD*|*SECRET*|*BASE64*|*JSON*|*SHEET_ID*|*ADDRESS*|*RECIPIENT*|*ACCOUNT_ID*)
+                [ ${#val} -ge 4 ] && echo "::add-mask::$val" ;;
+            esac
           done < .env
+      - name: Show AI settings in effect (no secrets)
+        run: python main.py show-config
       - name: Run
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_MODE: ${{ inputs.mode }}
         run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then python main.py run --dry-run; else python main.py run; fi
+          # Production only for an (enabled) scheduled run, or a manual run that explicitly chose "production".
+          # Anything else, including an empty or unknown value, is a read-only dry run.
+          if [ "$EVENT_NAME" = "schedule" ] || { [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$RUN_MODE" = "production" ]; }; then
+            echo "Mode: PRODUCTION"
+            python main.py run
+          else
+            echo "Mode: DRY RUN (read-only)"
+            python main.py run --dry-run
+          fi
+      - name: E-mail me if the run failed
+        if: failure()
+        run: python main.py notify-failure
       - name: Remove .env
         if: always()
         run: rm -f .env

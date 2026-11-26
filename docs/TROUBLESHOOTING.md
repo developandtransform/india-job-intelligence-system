@@ -16,5 +16,45 @@
 | Edited a threshold, nothing changed | Changes apply on the next run to all rows |
 | Workflow: `Secret APP_ENV_FILE is not set` | Add the secret (DEPLOYMENT.md) |
 | Many jobs in "Location Verification Required" | Remote/vague locations do not say they are open to India. Open the posting; if it is open to India, apply manually. Nothing is assumed |
-| A job shows "UNVERIFIED bundled seed" | Its company classification comes from the unverified seed. Add the company to the *Company Registry* tab with an evidence URL, or set `COMPANY_SEED_MODE=strict` |
+| A job shows "UNVERIFIED bundled seed" | Its company classification comes from the unverified seed. Add the company to the *Company Registry* tab with an evidence URL, (strict is now the default; `COMPANY_SEED_MODE=flag` in an old `.env` overrides it) |
 | Salary shows "per month ... CTC is not confirmed" | A monthly figure is not CTC; confirm the annual CTC on the employer page |
+
+
+## AI problems
+
+Start with `python main.py show-config` then `python main.py check-ai`.
+
+| What you see | Meaning | Fix |
+|---|---|---|
+| `HTTP 404 ... model ... not found` | The model name does not exist for your key (old name such as `gemini-2.0-flash`, a typo, or a `models/` prefix) | Set `GEMINI_MODEL=gemini-3.8-flash` in `.env` **and** in the GitHub `APP_ENV_FILE` secret. Check the name in Google AI Studio |
+| `GEMINI_MODEL` in the Actions log differs from your `.env` | The secret still holds the old file | Update `APP_ENV_FILE` (README section 17), re-run |
+| `HTTP 503 ... high demand` | Google is busy. Not your fault | Nothing: it retries, then the next provider is used |
+| `HTTP 429` | Free limit reached | Waits / switches provider automatically; lower `*_MAX_CALLS_PER_RUN` or add another provider |
+| `auth: HTTP 400 API key not valid` / `401` / `403` | Wrong or missing key | Re-create the key; paste without quotes or spaces |
+| `.env is not saved as UTF-8` | PowerShell `>` saved it as UTF-16 | Re-save in Notepad as UTF-8 (the loader also accepts UTF-16 and BOM) |
+| `CLOUDFLARE_ACCOUNT_ID must be the 32-character account ID` | Wrong ID | Copy it from the Cloudflare dashboard |
+| `quota` for Cloudflare | 10,000 free neurons/day used (resets 00:00 UTC) | Wait, or let the next provider take over |
+| Nothing from AI at all | No key set, `AI_ENABLED=false`, or every provider failed | The rules-only result is still complete and correct |
+
+
+## Alerts and monitoring
+
+| What you see | Meaning | Fix |
+|---|---|---|
+| E-mail "Job system alert: ... no jobs in 3 runs in a row" | A source returned nothing 3 times (blocked, changed layout, or a bad board id) | `python main.py validate-targets`; remove/fix the board. Not mailed again for 3 days |
+| "only N jobs today, usually about M (sudden drop)" | Volume fell below 30% of the recent median | Check the source in `Source Statistics`; often a temporary block |
+| "every AI provider failed today" | All providers errored; rules still ran | `python main.py check-ai` |
+| E-mail "Job system: daily run FAILED" | The workflow stopped before finishing | Open the link in the mail, read the red step, see this file |
+| Change history | `System Logs`, component `change`: salary / experience / location / category / status changes of existing jobs | Informational |
+| Which companies should I verify first? | `python main.py registry-queue` lists them by number of relevant jobs | Fill the `Company Registry` tab |
+
+## Final safety patch
+| Symptom | Fix |
+|---|---|
+| The 9:00 run does not start | By design: set repository variable `ENABLE_SCHEDULED_PRODUCTION` to `true` (docs/DEPLOYMENT.md). The run shows as skipped. |
+| Dry run says "stopped: spreadsheet structure problem" (exit code 3) | A tab or header is missing. A dry run never repairs it. Run `python main.py check` (write-enabled) once, then repeat the dry run. |
+| Scheduled run skipped even though I set the variable | The value must be exactly lowercase `true` with no spaces or quotes. `TRUE`, `True`, `true ` all keep it off by design. |
+| Dry run made no AI calls | Intended. Set `DRY_RUN_ALLOW_AI=true` to allow them. |
+| Many jobs now say Company Verification Required | Strict mode is the default. Verify the companies in the Company Registry tab, or check that your `.env`/`APP_ENV_FILE` has no old `COMPANY_SEED_MODE=flag`. |
+| Function shows "(unverified)" | The AI suggested a function but the posting has only one supporting term; check the role yourself. |
+| Apify did not run | Dry run, `APIFY_ENABLED` off, no token/budget, or the actor not enabled. See docs/CONFIGURATION.md. |

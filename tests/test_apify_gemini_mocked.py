@@ -92,9 +92,8 @@ class GemHttp:
 
 
 def gem(statuses, **kw):
-    g = GeminiAssistant("k", "m", kw.get("max_calls", 5), GemHttp(statuses))
-    g.retry_pause = 0
-    return g
+    # sleep is injected as a no-op so back-off pauses cost no real time
+    return GeminiAssistant("k", "m", kw.get("max_calls", 5), GemHttp(statuses), sleep=lambda s: None)
 
 
 def test_gemini_caches_identical_prompts():
@@ -104,7 +103,7 @@ def test_gemini_caches_identical_prompts():
     assert g.http.n == 1
 
 
-def test_gemini_retries_transient_error_once():
+def test_gemini_retries_transient_error():
     g = gem([503, 200])
     g.find_experience_quote("t", "Experience: 1-2 years")
     assert g.http.n == 2
@@ -120,7 +119,8 @@ def test_gemini_call_limit_and_self_disable():
     g = gem([500], max_calls=2)
     for i in range(10):
         g.find_experience_quote("t", f"text {i}")
-    assert g.http.n <= 3
+    # max_calls now limits QUESTIONS; each question may use up to 1 + 3 HTTP attempts (retry policy changed in Stage 1)
+    assert g.http.n <= 2 * 4
     assert not g.available
 
 

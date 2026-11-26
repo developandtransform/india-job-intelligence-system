@@ -17,6 +17,11 @@ class Store(Protocol):
     def write_views(self, views: dict[str, list[list[str]]]) -> None: ...
     def load_registry_rows(self) -> list[dict[str, str]]: ...
     def add_registry_names(self, names: list[str], today: str) -> int: ...
+    def validate_structure(self, check_ai_cache: bool = False) -> list[str]: ...
+    def load_recent_stats(self, limit: int = 600) -> list[list[str]]: ...
+    def load_recent_alerts(self, limit: int = 400) -> list[list[str]]: ...
+    def load_ai_cache(self) -> list[dict[str, str]]: ...
+    def save_ai_cache(self, rows: list[list[str]]) -> None: ...
     def append_stats(self, rows: list[list[str]]) -> None: ...
     def append_logs(self, rows: list[list[str]]) -> None: ...
     def mark_reported(self, marks: dict[str, tuple[str, str]]) -> None: ...
@@ -32,6 +37,7 @@ class MemoryStore:
         self.stats: list[list[str]] = []
         self.logs: list[list[str]] = []
         self.registry: list[dict[str, str]] = registry_rows or []
+        self.ai_cache: list[list[str]] = []
         self.writes = 0
 
     def prepare(self) -> None:
@@ -69,6 +75,22 @@ class MemoryStore:
                 have.add(norm_company(name))
                 n += 1
         return n
+
+    def validate_structure(self, check_ai_cache: bool = False) -> list[str]:
+        return list(getattr(self, "structure_problems", []))
+
+    def load_recent_stats(self, limit: int = 600) -> list[list[str]]:
+        return [list(r) for r in self.stats[-limit:]]
+
+    def load_recent_alerts(self, limit: int = 400) -> list[list[str]]:
+        return [list(r) for r in self.logs[-limit:] if len(r) > 2 and r[2] == "alert"]
+
+    def load_ai_cache(self) -> list[dict[str, str]]:
+        from processing.ai_cache import CACHE_HEADERS
+        return [dict(zip(CACHE_HEADERS, r)) for r in self.ai_cache]
+
+    def save_ai_cache(self, rows: list[list[str]]) -> None:
+        self.ai_cache = [list(r) for r in rows]
 
     def append_stats(self, rows: list[list[str]]) -> None:
         self.stats.extend(rows)

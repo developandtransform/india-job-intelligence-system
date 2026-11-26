@@ -51,11 +51,11 @@ Do the first-run steps in [section 15](#15-windows-installation-and-setup) (`che
 ## 2. Key features
 
 - Four source families: **JobSpy**, **ATS public job boards**, **career-page JSON-LD**, and **optional paid Apify actors** (all off by default). Each source is independent; one failing never stops the others.
-- **Google Sheets is the only database** (no other DB). 15 tabs (the 13 requested plus *Company Registry* and *Location Verification Required*), permanent master "All Jobs".
+- **Google Sheets is the only database** (no other DB). 16 tabs (the 13 requested plus *Company Registry*, *Location Verification Required* and the small technical *AI Cache* tab), permanent master "All Jobs".
 - Strict, configurable rules enforced in code; every decision is explained per job.
 - Unverified information never silently decides eligibility (company seed, ambiguous remote roles, unclear pay and experience all surface as *Verification Required* or a visible warning).
 - Your manual **Application Status** and **Notes** are never overwritten.
-- Daily Gmail digest, GitHub Actions schedule, optional Gemini helper (rules-based fallback always works).
+- Daily Gmail digest, GitHub Actions schedule, optional multi-provider AI helper (rules-based fallback always works; see [docs/AI_PROVIDERS.md](docs/AI_PROVIDERS.md)).
 
 ## 3. Eligibility rules
 
@@ -106,7 +106,7 @@ Full detail and precedence: [docs/FILTERING_LOGIC.md](docs/FILTERING_LOGIC.md).
 | ATS boards: Ashby, SmartRecruiters, Workable, Recruitee, Personio, Teamtailor, Breezy, Workday, Oracle Recruiting | Implemented, **not tested** |
 | Career pages (schema.org JSON-LD) | Implemented, **not tested**; no pages are configured by default |
 | Apify actors: Naukri, LinkedIn, IIMJobs, Glassdoor, Google Jobs, Workday | **Experimental**, off by default, never run. Spend gating and limits are tested with fakes. IIMJobs is optional and never a dependency |
-| Gemini helper | Implemented; retry/cache/limits tested with a fake |
+| AI providers (Groq, Gemini, Cloudflare, OpenRouter, custom) | Implemented; retry/fail-over/cache tested with fakes only |
 | Hirist, Foundit, Shine, Instahyre, TimesJobs | **Unsupported** (no public API, not in JobSpy) |
 | SuccessFactors, iCIMS, Jobvite, Zoho Recruit, Rippling, Eightfold, Pinpoint | **Unsupported** |
 
@@ -184,11 +184,11 @@ A 0-100 score for ranking only: function fit 30, experience 15, pay 15, location
 
 Safety: jobs are never deleted; only changed cells are written; your two manual columns are never written for existing rows; if rows were re-ordered during a run, the write is aborted. First/last-seen dates and all source URLs are kept. Quota/server errors are retried with back-off; permanent errors (permission, not found) are not. Meaning of every column: [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md).
 
-**Company Registry.** Unknown companies are added automatically. Fill *Classification* and, for startups, *Founded Year*, *Employee Count* and an *Evidence / Source URL*. Your rows always win. The bundled `config/company_seed.yaml` (234 well-known employers) is **UNVERIFIED general knowledge with no recorded evidence**; jobs relying on it carry a visible warning, and `COMPANY_SEED_MODE=strict` ignores it entirely.
+**Company Registry.** Unknown companies are added automatically. Fill *Classification* and, for startups, *Founded Year*, *Employee Count* and an *Evidence / Source URL*. Your rows always win. The bundled `config/company_seed.yaml` (234 well-known employers) is **UNVERIFIED general knowledge with no recorded evidence**; jobs relying on it carry a visible warning, and `COMPANY_SEED_MODE=strict` (now the default) ignores it entirely for eligibility.
 
 ## 12. Daily automation
 
-`.github/workflows/daily_jobs.yml` runs on cron `30 3 * * *` (03:30 UTC = **09:00 IST**) and on manual dispatch (with a *dry run* option). GitHub may start scheduled jobs several minutes late. Never run on GitHub so far (untested).
+`.github/workflows/daily_jobs.yml` runs on cron `30 3 * * *` (03:30 UTC = **09:00 IST**) and on manual dispatch. **The scheduled run is gated:** a `gate` job checks (with a case-sensitive shell comparison) that the repository variable `ENABLE_SCHEDULED_PRODUCTION` is exactly lowercase `true`; if it is missing or anything else (even `TRUE`), the scheduled job is skipped. Manual runs have a `mode` choice that defaults to `dry-run`; `production` must be chosen explicitly. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). GitHub may start scheduled jobs several minutes late. Never run on GitHub so far (untested).
 
 ## 13. Email digest
 
@@ -235,18 +235,25 @@ india-job-intelligence-system/
 │   ├── DATA_DICTIONARY.md
 │   ├── DEPLOYMENT.md
 │   ├── FILTERING_LOGIC.md
+│   ├── AI_PROVIDERS.md
 │   ├── REPOSITORY_AUDIT.md
 │   ├── TESTING.md
 │   └── TROUBLESHOOTING.md
+├── discovery/
+│   └── board_discovery.py   # verified ATS board finder (report only)
 ├── integrations/
 │   ├── __init__.py
+│   ├── ai_providers.py   # Groq / Gemini / Cloudflare / OpenRouter / custom adapters
+│   ├── ai_router.py   # priority order, fail-over, per-run state
 │   ├── email.py   # Gmail SMTP sender
 │   ├── google_sheets.py   # Google Sheets database
 │   ├── sheet_schema.py   # tabs and generated views
 │   └── store.py   # storage interface + in-memory test double
 ├── processing/
 │   ├── __init__.py
-│   ├── ai_assist.py   # optional Gemini helper
+│   ├── ai_assist.py   # AI helper (gates, cache use, usage counters)
+│   ├── ai_cache.py    # persistent answer cache (AI Cache tab)
+│   ├── monitoring.py   # source alerts, change log, registry work queue
 │   ├── company_verification.py   # startup rules + company registry
 │   ├── deduplication.py   # cross-source duplicate detection
 │   ├── eligibility.py   # combines all rules into a category
@@ -324,8 +331,11 @@ python main.py demo               # works with no accounts
 ```powershell
 python main.py check               # validates .env, opens the sheet, creates the tabs
 python main.py validate-targets    # tests each ATS board (internet)
-python main.py run --dry-run       # fetches and evaluates; writes and sends nothing
+python main.py check-ai             # tiny real test of each AI provider
+python main.py run --dry-run       # READ-ONLY: reads the Sheet, fetches free sources, evaluates; no Sheet change, no e-mail, no Apify, no AI (unless DRY_RUN_ALLOW_AI=true)
 python main.py run                 # real run
+python main.py registry-queue      # companies to verify first (reads your Sheet)
+python main.py discover-boards     # verify candidate ATS boards (writes a CSV to review)
 ```
 
 ## 16. Complete configuration reference
@@ -344,6 +354,19 @@ MINIMUM_INTERNSHIP_STIPEND_INR_MONTHLY=10000
 APIFY_ENABLED=false
 ```
 
+### AI helpers (optional)
+
+Providers are tried in this order: **Groq → Gemini → Cloudflare Workers AI → OpenRouter (off by default) → Python rules**.
+Each is optional and skipped when it has no key. Python rules always run first and AI is asked only about undecided jobs;
+answers are cached in the "AI Cache" tab. Full guide, limits and troubleshooting: [docs/AI_PROVIDERS.md](docs/AI_PROVIDERS.md).
+
+```powershell
+python main.py show-config   # which models are really in effect (no secrets)
+python main.py check-ai      # tiny real test of every enabled provider
+```
+
+To switch AI off completely set `AI_ENABLED=false` (or simply leave all keys empty). The system keeps working with rules only.
+
 ## 17. GitHub deployment
 
 ```powershell
@@ -358,7 +381,7 @@ git push -u origin main
 
 **APP_ENV_FILE (the only secret).** Repository > *Settings > Secrets and variables > Actions > New repository secret*; name `APP_ENV_FILE`; value = the **entire contents** of your local `.env`. The workflow rebuilds `.env` from it, masks the values, never commits or uploads it, and deletes it afterwards.
 
-**Manual run.** *Actions > Daily job run > Run workflow* (tick *Dry run* the first time). Use a **private** repository. Full steps: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+**Manual run.** *Actions > Daily job run > Run workflow* and keep `mode` = `dry-run` the first time (it is the default). Choose `production` only when you want a real run. Use a **private** repository. Full steps: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## 18. Security
 
@@ -377,7 +400,7 @@ pytest -q
 python main.py demo
 ```
 
-Result when this README was written: **191 passed** (Linux, Python 3.13), compile check clean, demo runs. The tests cover every rule table above, dedup, history and manual-status preservation, Sheets diffing/retries (fake), HTTP retries (local loopback server), e-mail escaping, config/credentials, Apify gating/limits (fake), Gemini (fake) and workflow settings. **Not tested:** any live network call, real Google/Gmail APIs, GitHub Actions. See [docs/TESTING.md](docs/TESTING.md).
+Result when this README was written: **292 passed** (Linux, Python 3.13), compile check clean, demo runs. The tests cover every rule table above, dedup, history and manual-status preservation, Sheets diffing/retries (fake), HTTP retries (local loopback server), e-mail escaping, config/credentials, Apify gating/limits (fake), AI providers/router/cache (fakes), monitoring, board discovery (fake), digest caps and workflow settings. **Not tested:** any live network call, real Google/Gmail APIs, GitHub Actions. See [docs/TESTING.md](docs/TESTING.md).
 
 ## 20. Troubleshooting
 
@@ -392,6 +415,9 @@ Common problems (sheet permission, Base64, Gmail login, blocked sources, too man
 - Remote or vague locations are sent to *Location Verification Required* (a category added beyond the original 13 tabs).
 - The company seed is unverified; startup status needs your evidence.
 - Google Sheets cell limit (10 million) and API quotas apply.
+- **No AI provider, discovery request, alert e-mail or Sheets write added in the latest update has been run against the real service** - they are covered by fakes only. Run `python main.py check-ai`, `python main.py check` and a dry run first.
+- If an employer edits a posting, the change is noticed only when the same source returns the changed text (a structured salary field that changes while the text stays identical is not detected).
+- Free AI limits change; the numbers in docs/AI_PROVIDERS.md are what the providers' own documentation said in Nov 2026.
 
 ## 22. Cost breakdown
 
@@ -404,12 +430,22 @@ Common problems (sheet permission, Base64, Gmail login, blocked sources, too man
 
 ## 23. Roadmap
 
-Planned, **not implemented**: verified Indian ATS board list, Hirist/Foundit via compliant routes if any exist, company evidence helper, a read-only summary dashboard tab.
+Planned, **not implemented**: a verified Indian ATS board list (the `discover-boards` helper now finds candidates for you to verify), Hirist/Foundit via compliant routes if any exist, company evidence helper, a read-only summary dashboard tab.
 
 ## 24. Licence and acknowledgements
 
-MIT ([LICENSE](LICENSE)). Credits and third-party licences: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Repository research: [docs/REPOSITORY_AUDIT.md](docs/REPOSITORY_AUDIT.md). Quality audit of this version: [docs/ACCEPTANCE_AUDIT.md](docs/ACCEPTANCE_AUDIT.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+MIT ([LICENSE](LICENSE)). Credits and third-party licences: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Repository research: [docs/REPOSITORY_AUDIT.md](docs/REPOSITORY_AUDIT.md). Quality audit of this version: [docs/ACCEPTANCE_AUDIT.md](docs/ACCEPTANCE_AUDIT.md). Latest improvements and what is tested vs not: [docs/IMPROVEMENT_REPORT.md](docs/IMPROVEMENT_REPORT.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 25. Disclaimer
 
 Provided as is, without warranty. Job-board terms of service may restrict automated access; you are responsible for how you use JobSpy, Apify and any source. Postings and pay shown may be wrong or outdated: verify on the employer's page before applying. This tool gives no employment, legal or financial advice.
+
+
+## 21. Final safety patch (what changed and how to test it)
+
+- **Scheduled production is off until you switch it on.** Cron `30 3 * * *` is unchanged, but the job needs repo variable `ENABLE_SCHEDULED_PRODUCTION=true`. Missing or `false` = skipped. Manual runs default to Dry Run.
+- **Dry Run is read-only.** It validates the spreadsheet structure without repairing it (every required tab and its headers: All Jobs, Company Registry, Source Statistics, System Logs and all generated views; extra columns of yours are fine; missing tabs, empty header rows and missing columns are reported and the run stops with exit code 3), writes nothing, sends no e-mail, never executes paid connectors (Apify) and makes no AI requests unless `DRY_RUN_ALLOW_AI=true`. The report lists every skipped operation. `main.py check` and normal runs still prepare the tabs.
+- **`COMPANY_SEED_MODE=strict` is the default.** Unverified seed data never counts as verified evidence. Startups need age >= 5 and >= 90 employees; unknown values mean *Company Verification Required*.
+- **Apify** stays off by default and is gated by Dry Run, the master switch, token, approved budget, per-actor switch and spending caps; a failed call is never retried as a new paid run.
+- **AI function labels are checked.** A suggested function needs at least 2 of its own keywords in the posting to be accepted; 1 keyword = kept as "(unverified)" with the lowest score and a flag; 0 = rejected.
+- **Test it:** `python -m pytest -q` (383 tests, all offline/mocked; the 5 workflow-script tests need `bash` and skip without it), `python -m compileall -q .`, `python main.py demo`.

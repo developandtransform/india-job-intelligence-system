@@ -43,3 +43,11 @@ flowchart LR
 5. **Fail safe.** Each connector, each board and each record is isolated. Email failure does not fail the run; sheet failure does (so you notice).
 6. **A score never overrides a rule.** Category precedence is in `FILTERING_LOGIC.md`.
 7. **Cost control.** Apify needs four independent opt-ins and a dollar budget (see `CONFIGURATION.md`).
+
+
+## AI, monitoring and discovery (added later)
+
+- `integrations/ai_providers.py` (adapters + retry/backoff + redaction), `integrations/ai_router.py` (priority, fail-over, cool-downs, limits),
+  `processing/ai_assist.py` (gates + usage counters), `processing/ai_cache.py` ("AI Cache" tab). See [AI_PROVIDERS.md](AI_PROVIDERS.md).
+- `processing/monitoring.py`: source issues, alert de-duplication, change log, Company Registry work queue.
+- `discovery/board_discovery.py`: verified ATS board finder (report only).

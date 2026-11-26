@@ -14,6 +14,8 @@ A high match score can never override a failed rule.
 """
 from __future__ import annotations
 
+import logging
+
 from dataclasses import dataclass
 from datetime import date
 
@@ -22,9 +24,10 @@ from core.models import Job
 from core.textutil import fmt_num, parse_num, short_hash
 from processing import experience_filter as xf
 from processing import salary_filter as sf
-from processing.ai_assist import GeminiAssistant
+from config.profile import FUNCTIONS
+from processing.ai_assist import AIAssistant, AIUsage
 from processing.company_verification import CompanyRegistry, evaluate_company
-from processing.scoring import FunctionMatch, detect_function, score_job
+from processing.scoring import FunctionMatch, detect_function, function_evidence, score_job
 
 OUT_OF_SCOPE_REASONS = ("Location restriction", "Irrelevant position", "Other")
 
@@ -34,7 +37,12 @@ class EvalContext:
     settings: Settings
     registry: CompanyRegistry
     today: date
-    ai: GeminiAssistant | None = None
+    ai: AIAssistant | None = None
+    usage: AIUsage | None = None          # set in __post_init__: shared with the assistant so counts agree
+
+    def __post_init__(self) -> None:
+        if self.usage is None:
+            self.usage = self.ai.usage if self.ai is not None else AIUsage()
 
 
 def _exp_display(j: Job) -> str:
@@ -45,11 +53,54 @@ def _exp_display(j: Job) -> str:
     return f"{j.exp_min} yrs" if j.exp_min == j.exp_max else f"{j.exp_min}-{j.exp_max} yrs"
 
 
+log = logging.getLogger("eligibility")
+AI_FUNCTION_MIN_EVIDENCE = 2      # distinct supporting keywords needed before an AI-suggested function is believed
+
+
+def _job_key(j: Job) -> str:
+    return j.internal_id or f"{j.title}|{j.company}"
+
+
+def _ruled_out_without_ai(j: Job, ctx: EvalContext, check_experience: bool = True) -> bool:
+    """True when the deterministic rules already exclude the job, so an AI answer could not change the outcome."""
+    s = ctx.settings
+    if j.job_kind == "Other" or j.india_remote == "No":
+        return True
+    if check_experience:
+        res = xf.evaluate_experience(j.title, j.full_description, j.hint_exp_text, j.hint_exp_min, j.hint_exp_max,
+                                     s.maximum_experience_years, j.job_kind)
+        if res.status == xf.EXCLUDED:
+            return True
+    comp = sf.resolve_compensation(j.hint_salary, f"{j.title}\n{j.full_description}", j.job_kind == "Internship")
+    if j.job_kind == "Internship":
+        return sf.evaluate_internship(comp, s.minimum_internship_stipend_inr_monthly,
+                                      sf.internship_duration_months(j.full_description)).status == sf.EXCLUDED
+    if j.job_kind == "Full-time":
+        return sf.evaluate_fulltime(comp, s.minimum_ctc_lpa).status == sf.EXCLUDED
+    return False
+
+
+def ai_allowed(j: Job, ctx: EvalContext, check_experience: bool = True) -> bool:
+    """Gate in front of every AI question: AI only for jobs the rules could not settle, with enough text, and never
+    for jobs the rules already exclude. Counts every decision so the statistics are measured, not guessed."""
+    u = ctx.usage
+    if ctx.ai is None:
+        return False
+    if _ruled_out_without_ai(j, ctx, check_experience):
+        u.ineligible.add(_job_key(j))
+        return False
+    if len(j.title) + len(j.full_description) < ctx.settings.ai_min_description_chars:
+        u.thin_text.add(_job_key(j))
+        return False
+    u.needed.add(_job_key(j))
+    return True
+
+
 def _extract_experience(j: Job, ctx: EvalContext) -> None:
     limit = ctx.settings.maximum_experience_years
     res = xf.evaluate_experience(j.title, j.full_description, j.hint_exp_text, j.hint_exp_min, j.hint_exp_max, limit, j.job_kind)
-    if res.status == xf.VERIFY and not res.source and ctx.ai and len(j.full_description) >= 200:
-        quote = ctx.ai.find_experience_quote(j.title, j.full_description)
+    if res.status == xf.VERIFY and not res.source and ctx.ai and ai_allowed(j, ctx, check_experience=False):
+        quote = ctx.ai.find_experience_quote(j.title, j.full_description, _job_key(j))
         if quote:
             ai_res = xf.evaluate_experience("", quote, limit=limit, kind=j.job_kind)
             if ai_res.status != xf.VERIFY:
@@ -90,10 +141,22 @@ def evaluate_job(j: Job, ctx: EvalContext) -> None:
 
     # ---------------- employment type / location / function
     fm: FunctionMatch = detect_function(j.title, j.full_description)
-    if fm.strength == "none" and not fm.irrelevant and ctx.ai:
-        label = ctx.ai.suggest_function(j.title, j.full_description)
+    ctx.usage.seen.add(_job_key(j))
+    if fm.strength == "none" and not fm.irrelevant and ctx.ai and ai_allowed(j, ctx):
+        label = ctx.ai.suggest_function(j.title, j.full_description, _job_key(j))
         if label:
-            fm = FunctionMatch(label, "description", True, False)
+            # The AI only SUGGESTS. Python checks the posting for that function's own keywords before believing it.
+            ev = function_evidence(label, j.title, j.full_description)
+            if len(ev) >= AI_FUNCTION_MIN_EVIDENCE:                       # supported: scored exactly like a rule-based description match
+                fm = FunctionMatch(label, "description", FUNCTIONS[label][0], False)
+                ctx.usage.fn_accepted.add(_job_key(j))
+            elif ev:                                                       # one hint only: keep, but lowest score and visibly unverified
+                fm = FunctionMatch(f"{label} (unverified)", "generic", False, False)
+                flags.append(f"Function unverified: AI suggested {label} but the posting has only one supporting term ({ev[0]}) - check the role")
+                ctx.usage.fn_uncertain.add(_job_key(j))
+            else:                                                          # nothing in the text supports it: rejected, rules decide
+                ctx.usage.fn_rejected.add(_job_key(j))
+                log.info("AI function suggestion rejected (no supporting evidence in the posting)")
     j.function = fm.name
     if j.job_kind == "Other":
         exclusions.append("Other: employment type not supported (part-time/contract/freelance)")

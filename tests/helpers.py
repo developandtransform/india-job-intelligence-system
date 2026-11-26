@@ -14,6 +14,9 @@ TODAY = "2026-11-24"
 
 
 def settings(**over):
+    # The production default is COMPANY_SEED_MODE=strict (see tests/test_strict_company_default.py). The rule tests below
+    # use well-known seed companies (Infosys ...) only as a convenient employer, so they opt in to "flag" explicitly.
+    over.setdefault("company_seed_mode", "flag")
     return dataclasses.replace(load_settings(environ={}, env_path=Path("/nonexistent/.env")), **over)
 
 

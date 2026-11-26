@@ -266,6 +266,8 @@ class ApifyConnector(Connector):
         return {"Authorization": f"Bearer {self.settings.apify_token}", "Content-Type": "application/json"}
 
     def _run_actor(self, spec: ActorSpec, payload: dict, limit: int, max_usd: float, deadline: float) -> tuple[list[dict], float, str]:
+        if getattr(self.settings, "dry_run", False):
+            raise RuntimeError("dry run: Apify actors are never started")      # last line of defence, base.run() already skips
         actor = spec.actor_id.replace("/", "~")
         timeout = int(min(self.settings.apify_run_timeout_seconds, max(30, deadline - time.monotonic())))
         params = {"maxItems": limit, "maxTotalChargeUsd": max_usd, "timeout": timeout}
@@ -311,7 +313,12 @@ class ApifyConnector(Connector):
                     items, cost, status = self._run_actor(spec, payload, limit, max_usd, deadline)
                 except Exception as exc:  # noqa: BLE001
                     result.errors.append(f"apify:{key} '{term}': {type(exc).__name__}: {str(exc)[:200]}")
-                    continue
+                    # FAIL SAFE: after an error we cannot know whether a paid run was started (e.g. the answer was lost).
+                    # Count the most it could have cost and do NOT start another run for this actor - no automatic retry.
+                    self.tracker.record(key, max_usd)
+                    stats["cost_usd"] = round(stats["cost_usd"] + max_usd, 5)
+                    stats["skipped"] = "stopped after an error (no retry of paid runs)"
+                    break
                 result.requests += 1
                 cost = cost if cost > 0 else min(max_usd, spec.price_per_run + spec.price_per_result * len(items))   # conservative fallback
                 self.tracker.record(key, cost)

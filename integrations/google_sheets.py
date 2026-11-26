@@ -67,8 +67,9 @@ def explain_error(exc: Exception, service_email: str = "") -> str:
 
 
 class GoogleSheetsStore:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, read_only: bool = False) -> None:
         self.s = settings
+        self.read_only = read_only        # dry run: every write method refuses (belt and braces; the pipeline also avoids them)
         info = settings.service_account_info()
         self.service_email = info.get("client_email", "")
         creds = Credentials.from_service_account_info(info, scopes=SCOPES)
@@ -79,6 +80,10 @@ class GoogleSheetsStore:
         self._rows: list[list[str]] = []
         self._ids: list[str] = []
         self._pos: dict[str, int] = {}
+
+    def _guard(self, what: str) -> None:
+        if getattr(self, "read_only", False):
+            raise RuntimeError(f"read-only (dry run): refused to {what}")
 
     # ------------------------------------------------------------- basics
     def url(self) -> str:
@@ -101,8 +106,35 @@ class GoogleSheetsStore:
         self.ws = {w.title: w for w in self.sh.worksheets()}
 
     # ----------------------------------------------------------- structure
+    def validate_structure(self, check_ai_cache: bool = False) -> list[str]:
+        """READ-ONLY check used by dry runs: lists missing tabs / empty header rows / missing columns instead of repairing
+        them. Writes nothing. Extra user-created columns are fine. Required: All Jobs, Company Registry, Source Statistics,
+        System Logs and every generated view. The AI Cache tab is optional: it is only checked (never required) when it exists
+        and AI is going to use it (check_ai_cache=True)."""
+        if self.sh is None:
+            self.connect()
+        problems: list[str] = []
+        headers_for = {S.TAB_ALL: MASTER_COLUMNS, S.TAB_STATS: S.STATS_HEADERS, S.TAB_LOGS: S.LOG_HEADERS,
+                       S.TAB_REGISTRY: S.REGISTRY_HEADERS, **{t: S.VIEW_COLUMNS for t in S.VIEW_RULES}}
+        missing = [t for t in headers_for if t not in self.ws]
+        if missing:
+            problems.append("Missing tab(s): " + ", ".join(missing))
+        to_check = {t: h for t, h in headers_for.items() if t not in missing}
+        if check_ai_cache and S.TAB_AI_CACHE in self.ws:
+            to_check[S.TAB_AI_CACHE] = S.CACHE_HEADERS
+        for tab, headers in to_check.items():
+            first = [str(c).strip() for c in (self._retry_call(self.ws[tab].row_values, 1) or [])]
+            if not any(first):
+                problems.append(f"Tab '{tab}' has no header row")
+                continue
+            absent = [h for h in headers if h not in first]
+            if absent:
+                problems.append(f"Tab '{tab}' is missing column(s): {', '.join(absent)}")
+        return problems
+
     def prepare(self) -> None:
         """Create any missing tab, header row, filter, dropdown. Never touches existing data."""
+        self._guard("create/repair tabs, headers or formatting")
         if self.sh is None:
             self.connect()
         assert self.sh
@@ -122,7 +154,7 @@ class GoogleSheetsStore:
             self._refresh_worksheets()
             log.info("Created tabs: %s", ", ".join(missing))
         headers_for = {S.TAB_ALL: MASTER_COLUMNS, S.TAB_STATS: S.STATS_HEADERS, S.TAB_LOGS: S.LOG_HEADERS,
-                       S.TAB_REGISTRY: S.REGISTRY_HEADERS, **{t: S.VIEW_COLUMNS for t in S.VIEW_RULES}}
+                       S.TAB_REGISTRY: S.REGISTRY_HEADERS, S.TAB_AI_CACHE: S.CACHE_HEADERS, **{t: S.VIEW_COLUMNS for t in S.VIEW_RULES}}
         for tab, headers in headers_for.items():
             w = self.ws[tab]
             first = self._retry_call(w.row_values, 1)
@@ -228,6 +260,7 @@ class GoogleSheetsStore:
             self._retry_call(w.batch_update, chunk, value_input_option="RAW")
 
     def save_master(self, jobs: list[Job]) -> dict:
+        self._guard("write job records")
         w = self.ws[S.TAB_ALL]
         if not self._hdr:
             self.load_master()
@@ -289,6 +322,7 @@ class GoogleSheetsStore:
         data.append({"range": f"{rowcol_to_a1(row, c1)}:{rowcol_to_a1(row, c2)}", "values": [[v for _, v in run]]})
 
     def mark_reported(self, marks: dict[str, tuple[str, str]]) -> None:
+        self._guard("mark jobs as reported")
         w = self.ws[S.TAB_ALL]
         hi, di = self._hdr.get("Last Reported Hash"), self._hdr.get("Last Reported Date")
         if hi is None or di is None:
@@ -308,6 +342,7 @@ class GoogleSheetsStore:
 
     # ----------------------------------------------------------------- views
     def write_views(self, views: dict[str, list[list[str]]]) -> None:
+        self._guard("rewrite the view tabs")
         for tab, rows in views.items():
             w = self.ws[tab]
             self._retry_call(w.clear)
@@ -327,6 +362,7 @@ class GoogleSheetsStore:
         return [{h: (r[i] if i < len(r) else "") for i, h in enumerate(header)} for r in values[1:] if any(r)]
 
     def add_registry_names(self, names: list[str], today: str) -> int:
+        self._guard("add Company Registry rows")
         have = {norm_company(r.get("Company", "")) for r in self.load_registry_rows()}
         rows = []
         for n in names:
@@ -338,10 +374,39 @@ class GoogleSheetsStore:
             self._retry_call(self.ws[S.TAB_REGISTRY].append_rows, rows, value_input_option="RAW")
         return len(rows)
 
+    def load_recent_stats(self, limit: int = 600) -> list[list[str]]:
+        values = self._retry_call(self.ws[S.TAB_STATS].get_all_values)
+        return [r for r in values[1:] if any(r)][-limit:]
+
+    def load_recent_alerts(self, limit: int = 400) -> list[list[str]]:
+        values = self._retry_call(self.ws[S.TAB_LOGS].get_all_values)
+        return [r for r in values[1:] if len(r) > 2 and r[2] == "alert"][-limit:]
+
+    def load_ai_cache(self) -> list[dict[str, str]]:
+        values = self._retry_call(self.ws[S.TAB_AI_CACHE].get_all_values)
+        if len(values) < 2:
+            return []
+        header = values[0]
+        return [{h: (r[i] if i < len(r) else "") for i, h in enumerate(header)} for r in values[1:] if any(r)]
+
+    def save_ai_cache(self, rows: list[list[str]]) -> None:
+        """Rewrites only the small cache tab (never touches job data)."""
+        self._guard("write the AI cache")
+        w = self.ws[S.TAB_AI_CACHE]
+        self._retry_call(w.batch_clear, ["A2:E"])
+        if rows:
+            need = len(rows) + 5
+            if need > w.row_count:
+                self._retry_call(w.add_rows, need - w.row_count)
+            for off in range(0, len(rows), 500):
+                self._retry_call(w.update, range_name=f"A{off + 2}", values=rows[off: off + 500], value_input_option="RAW")
+
     def append_stats(self, rows: list[list[str]]) -> None:
+        self._guard("append statistics")
         if rows:
             self._retry_call(self.ws[S.TAB_STATS].append_rows, rows, value_input_option="RAW")
 
     def append_logs(self, rows: list[list[str]]) -> None:
+        self._guard("append logs")
         if rows:
             self._retry_call(self.ws[S.TAB_LOGS].append_rows, rows[:400], value_input_option="RAW")

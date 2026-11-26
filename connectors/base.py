@@ -49,6 +49,9 @@ class Connector(ABC):
         if not self.enabled():
             res.status, res.note = "skipped", "disabled"
             return res
+        if getattr(self.settings, "dry_run", False) and not self.free:
+            res.status, res.note = "skipped", "dry run: paid connector not executed"
+            return res
         start = time.monotonic()
         deadline = start + self.settings.source_time_budget_seconds
         try:

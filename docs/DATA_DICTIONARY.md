@@ -1,7 +1,7 @@
 # Data dictionary
 
 ## Tabs
-`All Jobs` (master, permanent) · generated views: `New Today`, `Strong Matches`, `Possible Matches`, `Paid Internships`, `Salary Undisclosed`, `Salary Verification Required`, `Company Verification Required`, `Experience Verification Required`, `Location Verification Required` (extra), `Applied`, `Rejected and Closed` · `Source Statistics` and `System Logs` (append-only) · `Company Registry` (extra tab, you edit it).
+`All Jobs` (master, permanent) · generated views: `New Today`, `Strong Matches`, `Possible Matches`, `Paid Internships`, `Salary Undisclosed`, `Salary Verification Required`, `Company Verification Required`, `Experience Verification Required`, `Location Verification Required` (extra), `Applied`, `Rejected and Closed` · `Source Statistics` and `System Logs` (append-only) · `Company Registry` (extra tab, you edit it) · `AI Cache` (extra technical tab, written by the program; safe to clear).
 
 View tabs are overwritten on every run: **edit Application Status and Notes only in `All Jobs`.** Views show at most 2,000 rows each.
 
@@ -83,5 +83,7 @@ Columns A and B are yours; the program never writes them for existing rows. The 
 
 ## Other tabs
 - **Source Statistics**: one row per connector per run (status, jobs fetched, new, dropped, requests, cost USD, seconds, errors).
-- **System Logs**: INFO+ log lines of the run (secrets redacted).
+- **System Logs**: INFO+ log lines of the run (secrets redacted). Also component `change` (field changes of existing jobs: category, status, CTC, stipend, experience, location; max 200 per run) and `alert` (alerts already e-mailed, used so the same issue is not mailed daily).
+- **Source Statistics, rows with Connector = `AI`**: one `summary` row (total AI calls, cache hits, jobs handled by rules only, jobs requiring AI, fallback attempts, skipped counts, estimated prompt tokens = chars/4) and one row per provider (model, calls, successes, failures, retries, switched-off reason). Counts are measured in the run.
+- **AI Cache**: `Key` (hash of the text sent), `Kind`, `Result (JSON)`, `Last Used`, `Hits`. No API keys or personal data; entries expire after 45 days.
 - **Company Registry**: Company, Classification, Founded Year, Employee Count, Evidence / Source URL, Verified By, Notes, Last Updated (used as the verification date), Verification Status (Verified = evidence URL present; otherwise Unverified / User-provided). Unknown companies are added automatically with blank facts; fill them in and the next run uses them.

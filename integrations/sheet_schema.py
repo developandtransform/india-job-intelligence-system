@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Callable
 
 from core.models import MASTER_COLUMNS, Job
+from processing.ai_cache import CACHE_HEADERS
 
 TAB_ALL = "All Jobs"
 TAB_NEW = "New Today"
@@ -19,10 +20,11 @@ TAB_APPLIED = "Applied"
 TAB_REJECTED = "Rejected and Closed"
 TAB_STATS = "Source Statistics"
 TAB_LOGS = "System Logs"
+TAB_AI_CACHE = "AI Cache"           # extra tab: remembered AI answers (see processing/ai_cache.py)
 TAB_REGISTRY = "Company Registry"      # extra tab (not in the original 13): where you record company facts
 
 TAB_ORDER = [TAB_ALL, TAB_NEW, TAB_STRONG, TAB_POSSIBLE, TAB_INTERN, TAB_SAL_UNDISC, TAB_SAL_VERIFY,
-             TAB_COMPANY_VERIFY, TAB_EXP_VERIFY, TAB_LOC_VERIFY, TAB_APPLIED, TAB_REJECTED, TAB_STATS, TAB_LOGS, TAB_REGISTRY]
+             TAB_COMPANY_VERIFY, TAB_EXP_VERIFY, TAB_LOC_VERIFY, TAB_APPLIED, TAB_REJECTED, TAB_STATS, TAB_LOGS, TAB_REGISTRY, TAB_AI_CACHE]
 
 VIEW_COLUMNS = ["Application Status", "Job Title", "Company", "Category", "Match Score", "Location", "CTC LPA",
                 "Monthly Stipend INR", "Experience Text", "Full-time/Internship", "Posted Date", "Direct Apply URL",

@@ -79,10 +79,16 @@ def build_digest(jobs: list[Job], summary: dict, settings: Settings, today: str,
     html_parts: list[str] = []
     text_parts: list[str] = []
     shown_total = 0
+    total_cap = max(1, getattr(settings, "email_max_jobs_total", 40))
     for cat, title, blurb in SECTIONS:
         lst = by_cat.get(cat, [])
         counts[cat] = len(lst)
         if not lst:
+            continue
+        room = total_cap - shown_total           # sections are in priority order, so lower ones are trimmed first
+        if room <= 0:
+            html_parts.append(f'<div style="font-size:12px;color:#666;margin-top:10px">{escape(title)}: {len(lst)} more in the Google Sheet / tomorrow\'s digest</div>')
+            text_parts.append(f"== {title}: {len(lst)} more in the sheet / tomorrow ==")
             continue
         if cat == "Company Verification Required":
             groups: dict[str, list[Job]] = {}
@@ -91,13 +97,14 @@ def build_digest(jobs: list[Job], summary: dict, settings: Settings, today: str,
             names = sorted(groups, key=lambda c: -max(x.match_score for x in groups[c]))
             shown, chosen = 0, []
             for n in names:
-                if shown >= cap:
+                if shown >= min(cap, room):
                     break
                 chosen.append(n)
                 shown += len(groups[n])
             shown_jobs = [j for n in chosen for j in groups[n]]
         else:
             shown_jobs = lst[:cap]
+        shown_jobs = shown_jobs[:room]
         for j in shown_jobs:
             marks[j.internal_id] = (j.content_hash, today)
         shown_total += len(shown_jobs)
@@ -116,18 +123,23 @@ def build_digest(jobs: list[Job], summary: dict, settings: Settings, today: str,
     head = (f"Fetched {summary.get('fetched', 0)} postings, {summary.get('new', 0)} new in scope, "
             f"{summary.get('dropped', 0)} dropped as out of scope, {summary.get('closed', 0)} closed. "
             f"Apify spend this run: ${cost:.2f}.")
+    issues = summary.get("issues", [])
+    issue_html = ("<h3>Needs attention</h3><ul>" + "".join(f"<li>{escape(i)}</li>" for i in issues[:8]) + "</ul>") if issues else ""
+    issue_text = ("\nNeeds attention:\n" + "\n".join(f"  - {i}" for i in issues[:8])) if issues else ""
+    overview = " | ".join(f"{t}: {counts.get(c, 0)}" for c, t, _ in SECTIONS if counts.get(c, 0))
+    head += f" Waiting to be reported - {overview}." if overview else ""
     errs = summary.get("errors", [])
     err_html = ("<h3>Source problems</h3><ul>" + "".join(f"<li>{escape(e)}</li>" for e in errs[:10]) + "</ul>") if errs else ""
     err_text = ("\nSource problems:\n" + "\n".join(f"  - {e}" for e in errs[:10])) if errs else ""
     nothing = "" if shown_total else "<p>No new or changed matching jobs today.</p>"
     link = f'<p><a href="{escape(sheet_url, quote=True)}">Open the Google Sheet</a></p>' if sheet_url.startswith("https://") else ""
     html = (f'<html><body style="font-family:Arial,sans-serif;max-width:820px"><h2>India Job Intelligence - {escape(today)}</h2>'
-            f'<p>{escape(head)}</p>{nothing}{"".join(html_parts)}'
+            f'<p>{escape(head)}</p>{issue_html}{nothing}{"".join(html_parts)}'
             f'<h3>Source health</h3><table style="font-size:12px">{health_html}</table>{err_html}{link}'
             f'<p style="color:#888;font-size:11px">Experience &le; {settings.maximum_experience_years:g} yrs, CTC &ge; {settings.minimum_ctc_lpa:g} LPA, '
             f'stipend &ge; Rs {settings.minimum_internship_stipend_inr_monthly:,.0f}/month. Verify details on the employer page before applying. '
             f'This tool never applies to jobs for you.</p></body></html>')
     text = (f"India Job Intelligence - {today}\n{head}\n\n" + ("\n\n".join(text_parts) if text_parts else "No new or changed matching jobs today.")
-            + f"\n\nSource health:\n{health_text}{err_text}\n" + (f"\nSheet: {sheet_url}\n" if sheet_url else ""))
+            + f"\n{issue_text}\n\nSource health:\n{health_text}{err_text}\n" + (f"\nSheet: {sheet_url}\n" if sheet_url else ""))
     subject = f"Job digest {today}: {shown_total} new/changed ({counts.get('Strong Matches', 0)} strong)"
     return Digest(subject, html, text, marks, counts, shown_total)

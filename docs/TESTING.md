@@ -4,7 +4,7 @@
 pip install -r requirements-dev.txt
 pytest -q
 ```
-Result when this was written: **191 passed** (Python 3.13, Linux). `python -m compileall -q .` clean. `python main.py demo` runs.
+Result when this was written: **292 passed** (Python 3.13, Linux). `python -m compileall -q .` clean. `python main.py demo` runs.
 
 ## What the tests prove
 - `test_experience.py`, `test_salary.py`, `test_rules.py`: every row of the experience, CTC, stipend and company tables (0-3 eligible; 2-4, 3-5, 3+, 4+, 5+, 0-5 excluded; Rs 8,000 / 9,999 / 10,000 / 15,000; unpaid; undisclosed; 8,000-12,000; Rs 7 / 8 / 6-10 LPA; startup younger than 5 years, 89 employees, unknown headcount; non-startup with 20 employees), "up to" maximums, fixed/variable/monthly not treated as CTC, titles never inferring eligibility, universal experience limit.
@@ -17,6 +17,7 @@ Result when this was written: **191 passed** (Python 3.13, Linux). `python -m co
 - `test_email_and_urls.py`: HTML escaping, URL validation, SMTP failure handling with a fake SMTP.
 - `test_config.py`: defaults, `.env` loading and override, missing credentials, invalid Base64, only one env file.
 - `test_connectors.py`, `test_apify_gemini_mocked.py`: parsers on fixtures; Apify gating, result limits, budget, isolation; Gemini cache/retry/limits.
+- `test_ai_gemini_provider.py`, `test_ai_router.py`, `test_ai_usage_reduction.py`, `test_stage5_reliability.py`: AI providers (success, 404, 429, 503, timeout, bad key, malformed JSON, quota, fail-over, cool-down, call limits, redaction), 310-job synthetic run (rules-only jobs trigger no AI, ambiguous jobs do, cache hits, content-change invalidation, all-providers-down), board discovery, monitoring/alert de-duplication, change log, registry queue, digest caps, workflow safety. **All with fakes/mocks - none is a live test.**
 - `test_security_and_workflow.py`: workflow cron, manual dispatch, exactly one secret, no artifacts/commits, `.gitignore`, no key-like strings.
 
 ## What is NOT tested (be aware)
@@ -27,3 +28,10 @@ Expect to fix small issues on your first real run. Always start with `python mai
 
 ## Manual smoke test
 `python main.py demo` runs the whole pipeline offline on 9 invented jobs and writes CSVs plus `digest_preview.html` to `demo_output/`.
+
+## Running the whole suite (Windows PowerShell, local Python, GitHub Ubuntu)
+```powershell
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest -q
+```
+All paths in the tests are calculated from the test file, so the project can live in any folder. Five tests in `tests/test_workflow_gate.py` run the real workflow shell scripts and need `bash` (Git for Windows, WSL, or any Linux runner); without it they are reported as *skipped*, never as passed.
